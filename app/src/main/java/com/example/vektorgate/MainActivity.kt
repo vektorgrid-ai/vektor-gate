@@ -62,7 +62,7 @@ fun VektorGateApp(activity: AppCompatActivity, promptManager: BiometricPromptMan
             AppDestinations.HOME -> HomeScreen(activity, onConfigureCoreUrl = {
                 currentDestination = AppDestinations.SETTINGS
             })
-            AppDestinations.VERIFY -> VerifyScreen(promptManager)
+            AppDestinations.VERIFY -> VerifyScreen(activity, promptManager)
             AppDestinations.SETTINGS -> SettingsScreen(activity)
         }
     }

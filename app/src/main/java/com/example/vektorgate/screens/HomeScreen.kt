@@ -23,8 +23,6 @@ fun HomeScreen(
 ) {
     val coreUrl by SettingsManager.getInstance(activity).coreUrl
         .collectAsState(initial = null)
-    
-    Log.d("HomeScreen", "Core URL: $coreUrl")
 
     Column(
         modifier = Modifier
