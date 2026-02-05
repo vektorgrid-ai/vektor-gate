@@ -1,5 +1,7 @@
 package com.example.vektorgate.screens
 
+import android.database.sqlite.SQLiteConstraintException
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +34,9 @@ import com.example.vektorgate.security.ToolInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
+import java.time.LocalTime
+import kotlin.random.Random
+import kotlin.time.Duration
 
 class SettingsScreenState(
     val urlState: TextFieldValue,
@@ -151,24 +156,33 @@ fun GeneralSettings(state: SettingsScreenState) {
 @OptIn(InternalSerializationApi::class)
 @Composable
 fun DebugSettings(activity: AppCompatActivity) {
+    val coroutineScope: CoroutineScope = rememberCoroutineScope()
+
     Column {
         Text("Debug Settings", fontSize = 20.sp)
         Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = {
             val request = ApprovalRequest(
                 type = "approval_request",
-                request_id = "123",
+                request_id = Random.nextInt().toString(),
                 nonce = "123",
-                expires_at = 123,
+                expires_at = LocalTime.now().plusHours(1).toNanoOfDay(),
                 payload_hash = "123",
                 tool = ToolInfo(
-                    id = "1234",
+                    id = Random.nextInt().toString(),
                     description = "A dummy tool for testing",
                     risk_level = "none"
                 )
             )
             val manager = RequestManager()
-            manager.insertRequest(activity, request)
+            coroutineScope.launch {
+                try {
+                    manager.insertRequest(activity, request)
+                }
+                catch (e: SQLiteConstraintException) {
+                    Log.w("DebugSettings", "Can't insert request: ${e.message}. Id already exists")
+                }
+            }
         }) {
             Text("Send mock request")
         }

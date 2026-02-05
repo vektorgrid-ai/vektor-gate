@@ -1,6 +1,7 @@
 package com.example.vektorgate.requests
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import com.example.vektorgate.requests.db.ApprovalRequestDatabase
 import com.example.vektorgate.requests.db.ToolInfoEntity
@@ -13,7 +14,7 @@ class RequestManager {
     // TODO: don't create a new db instance every time
 
     @OptIn(InternalSerializationApi::class)
-    fun insertRequest(applicationContext: Context, request: ApprovalRequest) {
+    suspend fun insertRequest(applicationContext: Context, request: ApprovalRequest) {
         val db = Room.databaseBuilder(
             applicationContext,
             ApprovalRequestDatabase::class.java, "approval_requests"
@@ -39,10 +40,12 @@ class RequestManager {
 
         toolInfoDao.insert(toolInfo)
         requestDao.insert(requestEntity)
+
+        Log.i("RequestManager", "Inserted request with id ${request.request_id}")
     }
 
     @OptIn(InternalSerializationApi::class)
-    fun getPendingRequests(applicationContext: Context): List<ApprovalRequest> {
+    suspend fun getPendingRequests(applicationContext: Context): List<ApprovalRequest> {
         val db = Room.databaseBuilder(
             applicationContext,
             ApprovalRequestDatabase::class.java, "approval_requests"

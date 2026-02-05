@@ -26,7 +26,7 @@ data class ApprovalRequestEntity(
 
 @Entity(tableName = "tool_info")
 data class ToolInfoEntity(
-    val id: String,
+    @PrimaryKey val id: String,
     val description: String,
     @ColumnInfo(name = "risk_level") val riskLevel: String
 )
