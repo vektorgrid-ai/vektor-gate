@@ -1,7 +1,6 @@
 package com.example.vektorgate.screens
 
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -148,6 +148,11 @@ fun GeneralSettings(state: SettingsScreenState) {
 fun DebugSettings() {
     Column {
         Text("Debug Settings", fontSize = 20.sp)
-        // Add debug settings here in the future
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = {
+            // TODO: implement approval request handler; send dummy request
+        }) {
+            Text("Send mock request")
+        }
     }
 }
