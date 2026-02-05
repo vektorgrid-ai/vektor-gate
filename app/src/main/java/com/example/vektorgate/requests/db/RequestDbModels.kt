@@ -8,13 +8,13 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "approval_request",
     foreignKeys = [
         ForeignKey(
-            entity = ToolInfo::class,
+            entity = ToolInfoEntity::class,
             parentColumns = ["id"],
             childColumns = ["tool_id"],
             onDelete = ForeignKey.CASCADE
     )]
 )
-data class ApprovalRequest(
+data class ApprovalRequestEntity(
     @PrimaryKey @ColumnInfo(name = "request_id") val requestId: String,
     @ColumnInfo(name = "tool_id") val tool: String,
     @ColumnInfo(name = "payload_hash") val payloadHash: String,
@@ -25,7 +25,7 @@ data class ApprovalRequest(
 )
 
 @Entity(tableName = "tool_info")
-data class ToolInfo(
+data class ToolInfoEntity(
     val id: String,
     val description: String,
     @ColumnInfo(name = "risk_level") val riskLevel: String

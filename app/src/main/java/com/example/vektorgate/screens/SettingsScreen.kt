@@ -26,8 +26,12 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vektorgate.data.SettingsManager
+import com.example.vektorgate.requests.RequestManager
+import com.example.vektorgate.security.ApprovalRequest
+import com.example.vektorgate.security.ToolInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.InternalSerializationApi
 
 class SettingsScreenState(
     val urlState: TextFieldValue,
@@ -110,7 +114,7 @@ fun SettingsScreen(activity: AppCompatActivity) {
         ) {
             GeneralSettings(state = state)
             Spacer(modifier = Modifier.height(24.dp))
-            DebugSettings()
+            DebugSettings(activity)
         }
     }
 }
@@ -144,13 +148,27 @@ fun GeneralSettings(state: SettingsScreenState) {
     }
 }
 
+@OptIn(InternalSerializationApi::class)
 @Composable
-fun DebugSettings() {
+fun DebugSettings(activity: AppCompatActivity) {
     Column {
         Text("Debug Settings", fontSize = 20.sp)
         Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = {
-            // TODO: implement approval request handler; send dummy request
+            val request = ApprovalRequest(
+                type = "approval_request",
+                request_id = "123",
+                nonce = "123",
+                expires_at = 123,
+                payload_hash = "123",
+                tool = ToolInfo(
+                    id = "1234",
+                    description = "A dummy tool for testing",
+                    risk_level = "none"
+                )
+            )
+            val manager = RequestManager()
+            manager.insertRequest(activity, request)
         }) {
             Text("Send mock request")
         }

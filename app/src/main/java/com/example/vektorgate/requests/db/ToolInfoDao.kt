@@ -7,8 +7,8 @@ import androidx.room.Query
 @Dao
 interface ToolInfoDao {
     @Insert
-    fun insert(info: ToolInfo)
+    fun insert(info: ToolInfoEntity)
 
     @Query("SELECT * FROM tool_info")
-    fun getAll(): List<ToolInfo>
+    fun getAll(): List<ToolInfoEntity>
 }
