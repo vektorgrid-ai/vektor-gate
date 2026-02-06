@@ -1,8 +1,11 @@
 package com.example.vektorgate.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.database.sqlite.SQLiteConstraintException
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,13 +39,13 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
 import java.time.LocalTime
 import kotlin.random.Random
-import kotlin.time.Duration
 
 class SettingsScreenState(
     val urlState: TextFieldValue,
     val onUrlChange: (TextFieldValue) -> Unit,
     val deviceNameState: TextFieldValue,
-    val onDeviceNameChange: (TextFieldValue) -> Unit
+    val onDeviceNameChange: (TextFieldValue) -> Unit,
+    val firebaseToken: String
 )
 
 @Composable
@@ -59,6 +62,8 @@ fun rememberSettingsScreenState(
     val storedDeviceName by manager.deviceName.collectAsState(initial = null)
     var deviceNameState by remember { mutableStateOf(TextFieldValue("")) }
     var isDeviceNameInitialized by remember { mutableStateOf(false) }
+
+    val firebaseToken by manager.firebaseToken.collectAsState(initial = "Loading...")
 
     LaunchedEffect(storedUrl) {
         if (storedUrl != null && !isUrlInitialized) {
@@ -90,12 +95,13 @@ fun rememberSettingsScreenState(
         Unit
     }
 
-    return remember(urlState, onUrlChange, deviceNameState, onDeviceNameChange) {
+    return remember(urlState, onUrlChange, deviceNameState, onDeviceNameChange, firebaseToken) {
         SettingsScreenState(
             urlState = urlState,
             onUrlChange = onUrlChange,
             deviceNameState = deviceNameState,
-            onDeviceNameChange = onDeviceNameChange
+            onDeviceNameChange = onDeviceNameChange,
+            firebaseToken = firebaseToken
         )
     }
 }
@@ -118,6 +124,8 @@ fun SettingsScreen(activity: AppCompatActivity) {
                 .verticalScroll(rememberScrollState())
         ) {
             GeneralSettings(state = state)
+            Spacer(modifier = Modifier.height(24.dp))
+            FirebaseSettings(activity, state)
             Spacer(modifier = Modifier.height(24.dp))
             DebugSettings(activity)
         }
@@ -150,6 +158,27 @@ fun GeneralSettings(state: SettingsScreenState) {
                 onValueChange = state.onDeviceNameChange
             )
         }
+    }
+}
+
+@Composable
+fun FirebaseSettings(activity: AppCompatActivity, state: SettingsScreenState) {
+    Column {
+        Text("Firebase Messaging", fontSize = 20.sp)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Registration Token:", fontSize = 14.sp)
+        Text(
+            text = state.firebaseToken,
+            fontSize = 10.sp,
+            lineHeight = 12.sp,
+            modifier = Modifier.padding(top = 4.dp)
+                .clickable(true) {
+                    val clipboardManager: ClipboardManager =
+                        activity.getSystemService(AppCompatActivity.CLIPBOARD_SERVICE) as ClipboardManager
+                    val clipData = ClipData.newPlainText("Firebase Token", state.firebaseToken)
+                    clipboardManager.setPrimaryClip(clipData)
+                }
+        )
     }
 }
 
