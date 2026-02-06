@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -50,6 +51,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.appcompat)
+    //implementation(libs.firebase.messaging.ktx)
+    implementation(libs.firebase.messaging)
+    implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -63,4 +67,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.firestore)
 }
