@@ -203,10 +203,10 @@ fun DebugSettings(activity: AppCompatActivity) {
                     risk_level = "none"
                 )
             )
-            val manager = RequestManager()
+            val manager = RequestManager(activity)
             coroutineScope.launch {
                 try {
-                    manager.insertRequest(activity, request)
+                    manager.insertRequest(request)
                 }
                 catch (e: SQLiteConstraintException) {
                     Log.w("DebugSettings", "Can't insert request: ${e.message}. Id already exists")

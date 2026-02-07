@@ -11,4 +11,8 @@ interface ToolInfoDao {
 
     @Query("SELECT * FROM tool_info")
     suspend fun getAll(): List<ToolInfoEntity>
+
+    @Query("SELECT * FROM tool_info WHERE id = :id")
+    suspend fun getById(id: String): ToolInfoEntity?
+
 }

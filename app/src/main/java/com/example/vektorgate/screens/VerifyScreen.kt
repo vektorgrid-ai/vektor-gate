@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,17 +38,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vektorgate.requests.RequestManager
 import com.example.vektorgate.security.ApprovalRequest
+import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
 
 @OptIn(InternalSerializationApi::class)
 @Composable
 fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptManager) {
-    val manager = remember { RequestManager() }
-    var pending by remember { mutableStateOf(listOf<ApprovalRequest>()) }
-    
-    LaunchedEffect(Unit) {
-        pending = manager.getPendingRequests(activity)
-    }
+    val manager = remember { RequestManager(activity) }
+    val pending by manager.getPendingRequestsFlow().collectAsState(initial = emptyList())
+    val coroutineScope = rememberCoroutineScope()
 
     val biometricResult by promptManager.promptResults.collectAsState(initial = null)
     val enrollLauncher = rememberLauncherForActivityResult(
@@ -89,11 +88,15 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
                         verticalAlignment = Alignment.CenterVertically) {
                         Text(text = request.request_id)
                         Spacer(modifier = Modifier.weight(1f))
-                        Button(onClick = {/*TODO*/}) {
+                        Button(onClick = {
+                            coroutineScope.launch { rejectRequest(request, manager) }
+                        }) {
                             Text("Reject")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = {/*TODO*/}) {
+                        Button(onClick = {
+                            coroutineScope.launch { approveRequest(request, manager) }
+                        }) {
                             Text("Approve")
                         }
                     }
@@ -116,4 +119,16 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
             }
         }
     }
+}
+
+@OptIn(InternalSerializationApi::class)
+suspend fun rejectRequest(request: ApprovalRequest, manager: RequestManager) {
+    manager.updateRequestState(request.request_id, "rejected")
+}
+
+@OptIn(InternalSerializationApi::class)
+suspend fun approveRequest(request: ApprovalRequest, manager: RequestManager) {
+    // TODO: biometric auth, send signed approval to server
+
+    manager.updateRequestState(request.request_id, "approved")
 }
