@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,27 +19,58 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.example.vektorgate.data.SettingsManager
+import com.example.vektorgate.requests.EnrollmentManager
 import com.example.vektorgate.screens.HomeScreen
 import com.example.vektorgate.screens.SettingsScreen
 import com.example.vektorgate.screens.VerifyScreen
 import com.example.vektorgate.security.biometric.BiometricPromptManager
 import com.example.vektorgate.ui.theme.VektorGateTheme
+import com.example.vektorgate.security.SecurityManager
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
-    val promptManager by lazy { BiometricPromptManager(this) }
+    private lateinit var enrollmentManager: EnrollmentManager
+    private lateinit var settingsManager: SettingsManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        settingsManager = SettingsManager.getInstance(this)
+        enrollmentManager = EnrollmentManager(SecurityManager(), settingsManager)
+
         askNotificationPermission()
+        observeCoreUrlChanges()
+
         setContent {
             VektorGateTheme {
-                VektorGateApp(this, promptManager)
+                VektorGateApp(this)
             }
+        }
+    }
+
+    private fun observeCoreUrlChanges() {
+        lifecycleScope.launch {
+            settingsManager.coreUrl
+                .distinctUntilChanged()
+                .collectLatest { coreUrl ->
+                    if (coreUrl.isNotEmpty()) {
+                        Toast.makeText(this@MainActivity, "Enrolling with server...", Toast.LENGTH_SHORT).show()
+                        val deviceName = settingsManager.deviceName.first()
+                        val firebaseToken = settingsManager.firebaseToken.first()
+                        enrollmentManager.enroll(coreUrl, deviceName, firebaseToken)
+                    }
+                }
         }
     }
 
@@ -73,22 +105,23 @@ class MainActivity : AppCompatActivity() {
 }
 
 @Composable
-fun VektorGateApp(activity: AppCompatActivity, promptManager: BiometricPromptManager) {
+fun VektorGateApp(activity: AppCompatActivity) {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
+    val promptManager = remember { BiometricPromptManager(activity) }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
-            AppDestinations.entries.filter { it.inNavbar }.forEach {
+            AppDestinations.entries.filter { it.inNavbar }.forEach { item ->
                 item(
                     icon = {
                         Icon(
-                            it.icon,
-                            contentDescription = it.label
+                            item.icon,
+                            contentDescription = item.label
                         )
                     },
-                    label = { Text(it.label) },
-                    selected = it == currentDestination,
-                    onClick = { currentDestination = it }
+                    label = { Text(item.label) },
+                    selected = item == currentDestination,
+                    onClick = { currentDestination = item }
                 )
             }
         }

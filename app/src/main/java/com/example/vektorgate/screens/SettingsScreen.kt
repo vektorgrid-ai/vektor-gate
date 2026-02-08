@@ -4,27 +4,14 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.database.sqlite.SQLiteConstraintException
 import android.util.Log
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
@@ -37,8 +24,9 @@ import com.example.vektorgate.security.ToolInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.time.LocalDateTime
-import java.time.LocalTime
 import kotlin.random.Random
 
 class SettingsScreenState(
@@ -46,7 +34,9 @@ class SettingsScreenState(
     val onUrlChange: (TextFieldValue) -> Unit,
     val deviceNameState: TextFieldValue,
     val onDeviceNameChange: (TextFieldValue) -> Unit,
-    val firebaseToken: String
+    val firebaseToken: String,
+    val deviceId: String,
+    val onSave: () -> Unit
 )
 
 @Composable
@@ -65,6 +55,7 @@ fun rememberSettingsScreenState(
     var isDeviceNameInitialized by remember { mutableStateOf(false) }
 
     val firebaseToken by manager.firebaseToken.collectAsState(initial = "Loading...")
+    val deviceId by manager.deviceId.collectAsState(initial = "Loading...")
 
     LaunchedEffect(storedUrl) {
         if (storedUrl != null && !isUrlInitialized) {
@@ -82,27 +73,32 @@ fun rememberSettingsScreenState(
 
     val onUrlChange = { newValue: TextFieldValue ->
         urlState = newValue
-        coroutineScope.launch {
-            manager.saveCoreUrl(newValue.text)
-        }
         Unit
     }
 
     val onDeviceNameChange = { newValue: TextFieldValue ->
         deviceNameState = newValue
+        Unit
+    }
+
+    val onSave = {
         coroutineScope.launch {
-            manager.saveDeviceName(newValue.text)
+            manager.saveCoreUrl(urlState.text)
+            manager.saveDeviceName(deviceNameState.text)
+            Toast.makeText(activity, "Settings Saved", Toast.LENGTH_SHORT).show()
         }
         Unit
     }
 
-    return remember(urlState, onUrlChange, deviceNameState, onDeviceNameChange, firebaseToken) {
+    return remember(urlState, deviceNameState, firebaseToken, deviceId) {
         SettingsScreenState(
             urlState = urlState,
             onUrlChange = onUrlChange,
             deviceNameState = deviceNameState,
             onDeviceNameChange = onDeviceNameChange,
-            firebaseToken = firebaseToken
+            firebaseToken = firebaseToken,
+            deviceId = deviceId,
+            onSave = onSave
         )
     }
 }
@@ -110,6 +106,8 @@ fun rememberSettingsScreenState(
 @Composable
 fun SettingsScreen(activity: AppCompatActivity) {
     val state = rememberSettingsScreenState(activity = activity)
+    val coroutineScope = rememberCoroutineScope()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -120,21 +118,63 @@ fun SettingsScreen(activity: AppCompatActivity) {
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .padding(top = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            GeneralSettings(state = state)
+            GeneralSettings(activity, state)
             Spacer(modifier = Modifier.height(24.dp))
             FirebaseSettings(activity, state)
             Spacer(modifier = Modifier.height(24.dp))
             DebugSettings(activity)
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(
+                onClick = {
+                    coroutineScope.launch {
+                        testConnection(activity, state.urlState.text)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Test Connection")
+            }
+        }
+        
+        Button(
+            onClick = state.onSave,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        ) {
+            Text("Save Settings")
         }
     }
 }
 
+private fun testConnection(activity: AppCompatActivity, url: String) {
+    if (url.isEmpty()) {
+        Toast.makeText(activity, "URL is empty", Toast.LENGTH_SHORT).show()
+        return
+    }
+    
+    val client = OkHttpClient()
+    val request = Request.Builder().url(url).build()
+    
+    try {
+        client.newCall(request).execute().use { response ->
+            if (response.isSuccessful || response.code == 404) { // 404 is fine, means we reached the server
+                Toast.makeText(activity, "Connection Successful!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(activity, "Server reached, but returned ${response.code}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    } catch (e: Exception) {
+        Log.e("SettingsScreen", "Connection test failed", e)
+        Toast.makeText(activity, "Failed to reach server: ${e.message}", Toast.LENGTH_LONG).show()
+    }
+}
+
 @Composable
-fun GeneralSettings(state: SettingsScreenState) {
+fun GeneralSettings(activity: AppCompatActivity, state: SettingsScreenState) {
     Column {
         Text("General Settings", fontSize = 20.sp)
         Spacer(modifier = Modifier.height(8.dp))
@@ -159,6 +199,20 @@ fun GeneralSettings(state: SettingsScreenState) {
                 onValueChange = state.onDeviceNameChange
             )
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("Device ID:", fontSize = 14.sp)
+        Text(
+            text = state.deviceId,
+            fontSize = 10.sp,
+            lineHeight = 12.sp,
+            modifier = Modifier.padding(top = 4.dp)
+                .clickable(true) {
+                    val clipboardManager: ClipboardManager =
+                        activity.getSystemService(AppCompatActivity.CLIPBOARD_SERVICE) as ClipboardManager
+                    val clipData = ClipData.newPlainText("Device ID", state.deviceId)
+                    clipboardManager.setPrimaryClip(clipData)
+                }
+        )
     }
 }
 

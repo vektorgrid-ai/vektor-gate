@@ -18,6 +18,7 @@ class SettingsManager private constructor(private val dataStore: DataStore<Prefe
         private val CORE_URL_KEY = stringPreferencesKey("core_url")
         private val DEVICE_NAME_KEY = stringPreferencesKey("device_name")
         private val FIREBASE_TOKEN_KEY = stringPreferencesKey("firebase_token")
+        private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
 
         @Volatile
         private var INSTANCE: SettingsManager? = null
@@ -46,6 +47,11 @@ class SettingsManager private constructor(private val dataStore: DataStore<Prefe
             preferences[FIREBASE_TOKEN_KEY] ?: "Not Set"
         }
 
+    val deviceId: Flow<String> = dataStore.data
+        .map { preferences ->
+            preferences[DEVICE_ID_KEY] ?: ""
+        }
+
     suspend fun saveCoreUrl(url: String) {
         Log.d("SettingsManager", "Saving core URL: $url")
         dataStore.edit { preferences ->
@@ -62,6 +68,12 @@ class SettingsManager private constructor(private val dataStore: DataStore<Prefe
     suspend fun saveFirebaseToken(token: String) {
         dataStore.edit { preferences ->
             preferences[FIREBASE_TOKEN_KEY] = token
+        }
+    }
+
+    suspend fun saveDeviceId(id: String) {
+        dataStore.edit { preferences ->
+            preferences[DEVICE_ID_KEY] = id
         }
     }
 }

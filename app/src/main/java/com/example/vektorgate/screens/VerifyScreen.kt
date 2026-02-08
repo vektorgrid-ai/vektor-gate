@@ -1,45 +1,38 @@
 package com.example.vektorgate.screens
 
 import android.content.Intent
+import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import com.example.vektorgate.security.biometric.BiometricPromptManager
-import android.provider.Settings
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.vektorgate.data.SettingsManager
 import com.example.vektorgate.requests.RequestManager
+import com.example.vektorgate.security.ApprovalHandler
 import com.example.vektorgate.security.ApprovalRequest
+import com.example.vektorgate.security.ApprovalResponse
+import com.example.vektorgate.security.SecurityManager
+import com.example.vektorgate.security.biometric.BiometricPromptManager
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.json.Json
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.IOException
 
 @OptIn(InternalSerializationApi::class)
 @Composable
@@ -47,88 +40,126 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
     val manager = remember { RequestManager(activity) }
     val pending by manager.getPendingRequestsFlow().collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
+    
+    // Track which request is currently being approved so we can process the result correctly
+    var activeRequest by remember { mutableStateOf<ApprovalRequest?>(null) }
 
-    val biometricResult by promptManager.promptResults.collectAsState(initial = null)
     val enrollLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
-        onResult = {
-            println("Activity result: $it")
-        }
+        onResult = { Log.d("VerifyScreen", "Enroll result: $it") }
     )
 
-    LaunchedEffect(biometricResult) {
-        if (biometricResult is BiometricPromptManager.BiometricResult.AuthenticationNotSet) {
-            val enrollIntent = Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
-                putExtra(
-                    Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
-                    BIOMETRIC_STRONG or DEVICE_CREDENTIAL
-                )
+    val settingsManager = remember { SettingsManager.getInstance(activity) }
+    val coreUrl by settingsManager.coreUrl.collectAsState(initial = "")
+    val deviceId by settingsManager.deviceId.collectAsState(initial = "")
+    val securityManager = remember { SecurityManager() }
+    val handler = remember { ApprovalHandler(securityManager, promptManager) }
+
+    if (!securityManager.hasKey()) {
+        securityManager.generateKeyPair()
+        Log.d("VerifyScreen", "Generated public key: ${securityManager.getPublicKeyBase64()}")
+    }
+
+    LaunchedEffect(Unit) {
+        promptManager.promptResults.collect { result ->
+            when (result) {
+                is BiometricPromptManager.BiometricResult.AuthenticationSuccess -> {
+                    activeRequest?.let { request ->
+                        coroutineScope.launch {
+                            val response = handler.processResult(result, request, deviceId)
+                            if (response != null && coreUrl.isNotEmpty()) {
+                                Log.i("VerifyScreen", "Approved request ${request.requestId}")
+                                manager.updateRequestState(request.requestId, "approved")
+                                sendResponseToServer("$coreUrl/companion/answer_request", response)
+                            }
+                            activeRequest = null
+                        }
+                    }
+                }
+                is BiometricPromptManager.BiometricResult.AuthenticationNotSet -> {
+                    val enrollIntent = Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
+                        putExtra(Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED, BIOMETRIC_STRONG or DEVICE_CREDENTIAL)
+                    }
+                    enrollLauncher.launch(enrollIntent)
+                }
+                is BiometricPromptManager.BiometricResult.AuthenticationError -> {
+                    Log.e("VerifyScreen", "Auth error: ${result.error}")
+                    activeRequest = null
+                }
+                else -> {
+                    activeRequest = null
+                }
             }
-            enrollLauncher.launch(enrollIntent)
         }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Text("Pending requests", fontSize = 24.sp,
             modifier = Modifier.padding(top = 75.dp, bottom = 20.dp, start = 50.dp))
+        
         Column(
-            modifier = Modifier.fillMaxSize()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             pending.forEach { request ->
-                Surface(modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     color = MaterialTheme.colorScheme.primaryContainer,
                     shape = RoundedCornerShape(8.dp)) {
                     Row(modifier = Modifier.fillMaxSize().padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "${request.tool.name} (Risk: ${request.tool.riskLevel}")
-                        Spacer(modifier = Modifier.weight(1f))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = request.tool.name, style = MaterialTheme.typography.labelLarge)
+                            Text(text = "Risk: ${request.tool.riskLevel}", style = MaterialTheme.typography.bodySmall)
+                        }
                         Button(onClick = {
-                            coroutineScope.launch { rejectRequest(request, manager) }
+                            coroutineScope.launch { manager.updateRequestState(request.requestId, "rejected") }
                         }) {
                             Text("Reject")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(onClick = {
-                            coroutineScope.launch { approveRequest(request, manager) }
+                            if (coreUrl.isEmpty()) {
+                                Log.w("VerifyScreen", "Core URL not set")
+                                // TODO: Show error to user
+                            } else {
+                                activeRequest = request
+                                handler.approveRequest(request) { error ->
+                                    Log.e("VerifyScreen", "Approval init error: $error")
+                                    activeRequest = null
+                                }
+                            }
                         }) {
                             Text("Approve")
                         }
                     }
                 }
-                Spacer(modifier = Modifier.heightIn(min = 8.dp))
             }
 
             if (pending.isEmpty()) {
-                Text("No pending requests")
-            }
-
-            Button(onClick = {
-                promptManager.showBiometricPrompt("Authenticate", "Test auth")
-            }) {
-                Text(text = "Authenticate")
-            }
-
-            if (biometricResult != null) {
-                Text(text = biometricResult.toString())
+                Text("No pending requests", modifier = Modifier.padding(top = 32.dp))
             }
         }
     }
 }
 
 @OptIn(InternalSerializationApi::class)
-suspend fun rejectRequest(request: ApprovalRequest, manager: RequestManager) {
-    manager.updateRequestState(request.requestId, "rejected")
-}
+fun sendResponseToServer(url: String, response: ApprovalResponse) {
+    val client = OkHttpClient()
+    val body = Json.encodeToString(response).toRequestBody("application/json".toMediaTypeOrNull())
+    val request = Request.Builder()
+        .url(url)
+        .post(body)
+        .build()
 
-@OptIn(InternalSerializationApi::class)
-suspend fun approveRequest(request: ApprovalRequest, manager: RequestManager) {
-    // TODO: biometric auth, send signed approval to server
-
-    manager.updateRequestState(request.requestId, "approved")
+    client.newCall(request).enqueue(object : Callback {
+        override fun onFailure(call: Call, e: IOException) {
+            Log.e("VerifyScreen", "Failed to send response", e)
+        }
+        override fun onResponse(call: Call, response: Response) {
+            Log.d("VerifyScreen", "Server response: ${response.code}")
+            response.close()
+        }
+    })
 }

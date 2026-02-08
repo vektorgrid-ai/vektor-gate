@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.room.runtime)
+    implementation(libs.okhttp)
     ksp(libs.androidx.room.compiler)
 
     implementation(platform(libs.firebase.bom))

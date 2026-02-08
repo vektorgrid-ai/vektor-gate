@@ -20,8 +20,8 @@ data class ToolInfo(
 
 @Serializable
 class ApprovalResponse(
-    val type: String = "approval_response",
     val request_id: String,
+    val device_id: String,
     val decision: String,
     val timestamp: Long,
     val signature: String,

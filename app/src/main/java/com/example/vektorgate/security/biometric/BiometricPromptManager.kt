@@ -5,14 +5,19 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
 class BiometricPromptManager(
     private val activity: AppCompatActivity
 ) {
-    private val resultChannel = Channel<BiometricResult>()
-    val promptResults = resultChannel.receiveAsFlow()
+    private val _promptResults = MutableSharedFlow<BiometricResult>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val promptResults = _promptResults.asSharedFlow()
 
     fun showBiometricPrompt(
         title: String,
@@ -25,14 +30,12 @@ class BiometricPromptManager(
         val promptInfoBuilder = BiometricPrompt.PromptInfo.Builder()
             .setTitle(title)
             .setDescription(description)
+            .setNegativeButtonText("Cancel")
             .setConfirmationRequired(true)
 
         if (cryptoObject == null) {
             promptInfoBuilder.setAllowedAuthenticators(authenticators)
         } else {
-            // When using CryptoObject, we can't use DEVICE_CREDENTIAL on older APIs easily 
-            // with BIOMETRIC_STRONG in the same way for some versions, 
-            // but for modern apps it's usually just BIOMETRIC_STRONG.
             promptInfoBuilder.setAllowedAuthenticators(BIOMETRIC_STRONG)
         }
 
@@ -40,15 +43,15 @@ class BiometricPromptManager(
 
         when(manager.canAuthenticate(BIOMETRIC_STRONG)) {
             BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
-                resultChannel.trySend(BiometricResult.HardwareUnavailable)
+                _promptResults.tryEmit(BiometricResult.HardwareUnavailable)
                 return
             }
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
-                resultChannel.trySend(BiometricResult.FeatureUnavailable)
+                _promptResults.tryEmit(BiometricResult.FeatureUnavailable)
                 return
             }
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                resultChannel.trySend(BiometricResult.AuthenticationNotSet)
+                _promptResults.tryEmit(BiometricResult.AuthenticationNotSet)
                 return
             }
             else -> Unit
@@ -60,17 +63,17 @@ class BiometricPromptManager(
                 errString: CharSequence
             ) {
                 super.onAuthenticationError(errorCode, errString)
-                resultChannel.trySend(BiometricResult.AuthenticationError(errString.toString()))
+                _promptResults.tryEmit(BiometricResult.AuthenticationError(errString.toString()))
             }
 
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
-                resultChannel.trySend(BiometricResult.AuthenticationSuccess(result.cryptoObject))
+                _promptResults.tryEmit(BiometricResult.AuthenticationSuccess(result.cryptoObject))
             }
 
             override fun onAuthenticationFailed() {
                 super.onAuthenticationFailed()
-                resultChannel.trySend(BiometricResult.AuthenticationFailed)
+                _promptResults.tryEmit(BiometricResult.AuthenticationFailed)
             }
         })
 

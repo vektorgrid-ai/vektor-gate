@@ -22,7 +22,6 @@ import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
 import java.time.OffsetDateTime
 
 class FirebaseRequestHandler : FirebaseMessagingService() {

@@ -62,7 +62,8 @@ class ApprovalHandler(
     @OptIn(InternalSerializationApi::class)
     fun processResult(
         result: BiometricPromptManager.BiometricResult,
-        request: ApprovalRequest
+        request: ApprovalRequest,
+        deviceId: String
     ): ApprovalResponse? {
         if (result is BiometricPromptManager.BiometricResult.AuthenticationSuccess) {
             val unlockedSignature = result.cryptoObject?.signature ?: return null
@@ -79,7 +80,8 @@ class ApprovalHandler(
                 decision = "approve",
                 timestamp = System.currentTimeMillis() / 1000,
                 signature = signatureBase64,
-                public_key = securityManager.getPublicKeyBase64() ?: ""
+                public_key = securityManager.getPublicKeyBase64() ?: "",
+                device_id = deviceId
             )
         }
         return null
