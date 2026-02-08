@@ -86,7 +86,7 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
                     Row(modifier = Modifier.fillMaxSize().padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = request.request_id)
+                        Text(text = "${request.tool.name} (Risk: ${request.tool.riskLevel}")
                         Spacer(modifier = Modifier.weight(1f))
                         Button(onClick = {
                             coroutineScope.launch { rejectRequest(request, manager) }
@@ -123,12 +123,12 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
 
 @OptIn(InternalSerializationApi::class)
 suspend fun rejectRequest(request: ApprovalRequest, manager: RequestManager) {
-    manager.updateRequestState(request.request_id, "rejected")
+    manager.updateRequestState(request.requestId, "rejected")
 }
 
 @OptIn(InternalSerializationApi::class)
 suspend fun approveRequest(request: ApprovalRequest, manager: RequestManager) {
     // TODO: biometric auth, send signed approval to server
 
-    manager.updateRequestState(request.request_id, "approved")
+    manager.updateRequestState(request.requestId, "approved")
 }

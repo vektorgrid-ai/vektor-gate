@@ -6,7 +6,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.RingtoneManager
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.OneTimeWorkRequest
@@ -16,11 +15,15 @@ import androidx.work.WorkerParameters
 import com.example.vektorgate.MainActivity
 import com.example.vektorgate.R
 import com.example.vektorgate.data.SettingsManager
+import com.example.vektorgate.security.ApprovalRequest
+import com.example.vektorgate.security.ToolInfo
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
 
 class FirebaseRequestHandler : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
@@ -33,10 +36,10 @@ class FirebaseRequestHandler : FirebaseMessagingService() {
 
             // For long-running tasks (10 seconds or more) use WorkManager
             // because Android might kill longer tasks to save battery
-            if (needsToBeScheduled()) {
+            if (needsToBeScheduled(remoteMessage.data)) {
                 scheduleJob()
             } else {
-                handleNow()
+                handleData(remoteMessage.data)
             }
         }
 
@@ -47,7 +50,7 @@ class FirebaseRequestHandler : FirebaseMessagingService() {
         }
     }
 
-    private fun needsToBeScheduled() = false // currently no tasks that are intended to be >10s
+    private fun needsToBeScheduled(dataPayload: Map<String, String>) = false // currently no tasks that are intended to be >10s
 
     /**
      * Called if the FCM registration token is updated. This may occur if the security of
@@ -67,8 +70,26 @@ class FirebaseRequestHandler : FirebaseMessagingService() {
             .enqueue()
     }
 
-    private fun handleNow() {
-        Log.d(TAG, "Short lived task is done.")
+    private fun handleData(payload: Map<String, String>) {
+        val manager = RequestManager(this)
+
+        val request = ApprovalRequest(
+            type = "approval_request",
+            requestId = payload["request_id"] ?: "",
+            nonce = payload["nonce"] ?: "",
+            expiresAt = OffsetDateTime.parse(payload["expires_at"]).toLocalDateTime(),
+            payloadHash = payload["payload_hash"] ?: "",
+            tool = ToolInfo(
+                name = payload["tool_name"] ?: "",
+                description = payload["tool_description"] ?: "",
+                riskLevel = payload["tool_risk_level"] ?: ""
+            )
+        )
+
+        val coroutineScope = CoroutineScope(Dispatchers.IO)
+        coroutineScope.launch {
+            manager.insertRequest(request)
+        }
     }
 
     private fun sendRegistrationToServer(token: String) {

@@ -1,28 +1,24 @@
 package com.example.vektorgate.security
 
 import kotlinx.serialization.Serializable
+import java.time.LocalDateTime
 
-@Serializable
-@kotlinx.serialization.InternalSerializationApi
-data class ApprovalRequest(
+class ApprovalRequest(
     val type: String,
-    val request_id: String,
+    val requestId: String,
     val tool: ToolInfo,
-    val payload_hash: String,
+    val payloadHash: String,
     val nonce: String,
-    val expires_at: Long
+    val expiresAt: LocalDateTime
 )
 
-@Serializable
-@kotlinx.serialization.InternalSerializationApi
 data class ToolInfo(
-    val id: String,
+    val name: String,
     val description: String,
-    val risk_level: String
+    val riskLevel: String
 )
 
 @Serializable
-@kotlinx.serialization.InternalSerializationApi
 class ApprovalResponse(
     val type: String = "approval_response",
     val request_id: String,

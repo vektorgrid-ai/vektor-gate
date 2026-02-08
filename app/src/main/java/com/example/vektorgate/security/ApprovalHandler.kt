@@ -2,6 +2,7 @@ package com.example.vektorgate.security
 
 import com.example.vektorgate.security.biometric.BiometricPromptManager
 import kotlinx.serialization.InternalSerializationApi
+import java.time.LocalDateTime
 
 class ApprovalHandler(
     private val securityManager: SecurityManager,
@@ -13,9 +14,7 @@ class ApprovalHandler(
      */
     @OptIn(InternalSerializationApi::class)
     fun validateRequest(request: ApprovalRequest): Pair<Boolean, String?> {
-        val currentTime = System.currentTimeMillis() / 1000
-        
-        if (request.expires_at < currentTime) {
+        if (request.expiresAt < LocalDateTime.now()) {
             return false to "Request has expired."
         }
         
@@ -51,7 +50,7 @@ class ApprovalHandler(
         // We show the human exactly what they are approving
         biometricPromptManager.showBiometricPrompt(
             title = "Confirm Approval",
-            description = "Action: ${request.tool.description}\nRisk: ${request.tool.risk_level.uppercase()}",
+            description = "Action: ${request.tool.description}\nRisk: ${request.tool.riskLevel.uppercase()}",
             cryptoObject = androidx.biometric.BiometricPrompt.CryptoObject(signature)
         )
     }
@@ -68,7 +67,7 @@ class ApprovalHandler(
         if (result is BiometricPromptManager.BiometricResult.AuthenticationSuccess) {
             val unlockedSignature = result.cryptoObject?.signature ?: return null
 
-            val dataToSign = "${request.request_id}|${request.nonce}|${request.payload_hash}"
+            val dataToSign = "${request.requestId}|${request.nonce}|${request.payloadHash}"
             
             val signatureBase64 = securityManager.signData(
                 unlockedSignature, 
@@ -76,7 +75,7 @@ class ApprovalHandler(
             )
 
             return ApprovalResponse(
-                request_id = request.request_id,
+                request_id = request.requestId,
                 decision = "approve",
                 timestamp = System.currentTimeMillis() / 1000,
                 signature = signatureBase64,

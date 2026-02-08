@@ -37,6 +37,7 @@ import com.example.vektorgate.security.ToolInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
+import java.time.LocalDateTime
 import java.time.LocalTime
 import kotlin.random.Random
 
@@ -193,14 +194,14 @@ fun DebugSettings(activity: AppCompatActivity) {
         Button(onClick = {
             val request = ApprovalRequest(
                 type = "approval_request",
-                request_id = Random.nextInt().toString(),
+                requestId = Random.nextInt().toString(),
                 nonce = "123",
-                expires_at = LocalTime.now().plusHours(1).toNanoOfDay(),
-                payload_hash = "123",
+                expiresAt = LocalDateTime.now().plusHours(1),
+                payloadHash = "123",
                 tool = ToolInfo(
-                    id = Random.nextInt().toString(),
+                    name = Random.nextInt().toString(),
                     description = "A dummy tool for testing",
-                    risk_level = "none"
+                    riskLevel = "none"
                 )
             )
             val manager = RequestManager(activity)
