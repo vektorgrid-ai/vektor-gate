@@ -16,8 +16,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.vektorgate.data.ConnectionStatus
 import com.example.vektorgate.data.SettingsManager
 import com.example.vektorgate.requests.RequestManager
 import com.example.vektorgate.security.ApprovalHandler
@@ -37,11 +39,15 @@ import java.io.IOException
 @OptIn(InternalSerializationApi::class)
 @Composable
 fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptManager) {
+    val settingsManager = remember { SettingsManager.getInstance(activity) }
+    val connectionStatus by settingsManager.connectionStatus.collectAsState()
+    val coreUrl by settingsManager.coreUrl.collectAsState(initial = "")
+    val deviceId by settingsManager.deviceId.collectAsState()
+    
     val manager = remember { RequestManager(activity) }
     val pending by manager.getPendingRequestsFlow().collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
     
-    // Track which request is currently being approved so we can process the result correctly
     var activeRequest by remember { mutableStateOf<ApprovalRequest?>(null) }
 
     val enrollLauncher = rememberLauncherForActivityResult(
@@ -49,15 +55,11 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
         onResult = { Log.d("VerifyScreen", "Enroll result: $it") }
     )
 
-    val settingsManager = remember { SettingsManager.getInstance(activity) }
-    val coreUrl by settingsManager.coreUrl.collectAsState(initial = "")
-    val deviceId by settingsManager.deviceId.collectAsState(initial = "")
     val securityManager = remember { SecurityManager() }
     val handler = remember { ApprovalHandler(securityManager, promptManager) }
 
     if (!securityManager.hasKey()) {
         securityManager.generateKeyPair()
-        Log.d("VerifyScreen", "Generated public key: ${securityManager.getPublicKeyBase64()}")
     }
 
     LaunchedEffect(Unit) {
@@ -66,9 +68,8 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
                 is BiometricPromptManager.BiometricResult.AuthenticationSuccess -> {
                     activeRequest?.let { request ->
                         coroutineScope.launch {
-                            val response = handler.processResult(result, request, deviceId)
+                            val response = handler.processResult(result, request, deviceId ?: "")
                             if (response != null && coreUrl.isNotEmpty()) {
-                                Log.i("VerifyScreen", "Approved request ${request.requestId}")
                                 manager.updateRequestState(request.requestId, "approved")
                                 sendResponseToServer("$coreUrl/companion/answer_request", response)
                             }
@@ -82,10 +83,6 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
                     }
                     enrollLauncher.launch(enrollIntent)
                 }
-                is BiometricPromptManager.BiometricResult.AuthenticationError -> {
-                    Log.e("VerifyScreen", "Auth error: ${result.error}")
-                    activeRequest = null
-                }
                 else -> {
                     activeRequest = null
                 }
@@ -97,48 +94,58 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
         Text("Pending requests", fontSize = 24.sp,
             modifier = Modifier.padding(top = 75.dp, bottom = 20.dp, start = 50.dp))
         
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            pending.forEach { request ->
-                Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(8.dp)) {
-                    Row(modifier = Modifier.fillMaxSize().padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = request.tool.name, style = MaterialTheme.typography.labelLarge)
-                            Text(text = "Risk: ${request.tool.riskLevel}", style = MaterialTheme.typography.bodySmall)
-                        }
-                        Button(onClick = {
-                            coroutineScope.launch { manager.updateRequestState(request.requestId, "rejected") }
-                        }) {
-                            Text("Reject")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = {
-                            if (coreUrl.isEmpty()) {
-                                Log.w("VerifyScreen", "Core URL not set")
-                                // TODO: Show error to user
-                            } else {
-                                activeRequest = request
-                                handler.approveRequest(request) { error ->
-                                    Log.e("VerifyScreen", "Approval init error: $error")
-                                    activeRequest = null
-                                }
+        if (connectionStatus != ConnectionStatus.CONNECTED) {
+            Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "Verification unavailable while disconnected from server.",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.Top,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                pending.forEach { request ->
+                    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(8.dp)) {
+                        Row(modifier = Modifier.fillMaxSize().padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = request.tool.name, style = MaterialTheme.typography.labelLarge)
+                                Text(text = "Risk: ${request.tool.riskLevel}", style = MaterialTheme.typography.bodySmall)
                             }
-                        }) {
-                            Text("Approve")
+                            Button(onClick = {
+                                coroutineScope.launch { manager.updateRequestState(request.requestId, "rejected") }
+                            }) {
+                                Text("Reject")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(onClick = {
+                                if (coreUrl.isEmpty()) {
+                                    Log.w("VerifyScreen", "Core URL not set")
+                                } else {
+                                    activeRequest = request
+                                    handler.approveRequest(request) { error ->
+                                        Log.e("VerifyScreen", "Approval init error: $error")
+                                        activeRequest = null
+                                    }
+                                }
+                            }) {
+                                Text("Approve")
+                            }
                         }
                     }
                 }
-            }
 
-            if (pending.isEmpty()) {
-                Text("No pending requests", modifier = Modifier.padding(top = 32.dp))
+                if (pending.isEmpty()) {
+                    Text("No pending requests", modifier = Modifier.padding(top = 32.dp))
+                }
             }
         }
     }

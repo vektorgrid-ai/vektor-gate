@@ -8,6 +8,11 @@ class EnrollmentRequest (
     val public_key: String,
     val firebase_token: String
 )
+@Serializable
+data class EnrollmentResponse(
+    val device_id: String,
+    val status: String
+)
 
 @Serializable
 class NewTokenRequest (

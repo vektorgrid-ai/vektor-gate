@@ -4,11 +4,16 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
@@ -17,14 +22,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.example.vektorgate.data.ConnectionStatus
 import com.example.vektorgate.data.SettingsManager
 import com.example.vektorgate.requests.EnrollmentManager
 import com.example.vektorgate.screens.HomeScreen
@@ -54,7 +68,7 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             VektorGateTheme {
-                VektorGateApp(this)
+                VektorGateApp(this, settingsManager)
             }
         }
     }
@@ -65,10 +79,12 @@ class MainActivity : AppCompatActivity() {
                 .distinctUntilChanged()
                 .collectLatest { coreUrl ->
                     if (coreUrl.isNotEmpty()) {
-                        Toast.makeText(this@MainActivity, "Enrolling with server...", Toast.LENGTH_SHORT).show()
                         val deviceName = settingsManager.deviceName.first()
                         val firebaseToken = settingsManager.firebaseToken.first()
                         enrollmentManager.enroll(coreUrl, deviceName, firebaseToken)
+                    } else {
+                        settingsManager.setConnectionStatus(ConnectionStatus.DISCONNECTED)
+                        settingsManager.setDeviceId(null)
                     }
                 }
         }
@@ -85,19 +101,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun askNotificationPermission() {
-        // This is only necessary for API level >= 33 (TIRAMISU)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
                 PackageManager.PERMISSION_GRANTED
             ) {
                 // FCM SDK (and your app) can post notifications.
             } else if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
-                // TODO: display an educational UI explaining to the user the features that will be enabled
-                //       by them granting the POST_NOTIFICATION permission. This UI should provide the user
-                //       "OK" and "No thanks" buttons. If the user selects "OK," directly request the permission.
-                //       If the user selects "No thanks," allow the user to continue without notifications.
+                // TODO: display rationale
             } else {
-                // Directly ask for the permission
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
@@ -105,33 +116,62 @@ class MainActivity : AppCompatActivity() {
 }
 
 @Composable
-fun VektorGateApp(activity: AppCompatActivity) {
+fun VektorGateApp(activity: AppCompatActivity, settingsManager: SettingsManager) {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
     val promptManager = remember { BiometricPromptManager(activity) }
+    val connectionStatus by settingsManager.connectionStatus.collectAsState()
 
-    NavigationSuiteScaffold(
-        navigationSuiteItems = {
-            AppDestinations.entries.filter { it.inNavbar }.forEach { item ->
-                item(
-                    icon = {
-                        Icon(
-                            item.icon,
-                            contentDescription = item.label
-                        )
-                    },
-                    label = { Text(item.label) },
-                    selected = item == currentDestination,
-                    onClick = { currentDestination = item }
-                )
+    Column {
+        if (connectionStatus != ConnectionStatus.CONNECTED) {
+            val (statusText, statusColor) = when (connectionStatus) {
+                ConnectionStatus.DISCONNECTED -> "Disconnected from Server" to Color.Red
+                ConnectionStatus.CONNECTING -> "Connecting to Server..." to Color(0xFFFFA500) // Orange
+                else -> "" to Color.Transparent
+            }
+            
+            if (statusText.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(statusColor)
+                        .statusBarsPadding()
+                        .padding(vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = statusText,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
             }
         }
-    ) {
-        when (currentDestination) {
-            AppDestinations.HOME -> HomeScreen(activity, onConfigureCoreUrl = {
-                currentDestination = AppDestinations.SETTINGS
-            })
-            AppDestinations.VERIFY -> VerifyScreen(activity, promptManager)
-            AppDestinations.SETTINGS -> SettingsScreen(activity)
+
+        NavigationSuiteScaffold(
+            navigationSuiteItems = {
+                AppDestinations.entries.filter { it.inNavbar }.forEach { item ->
+                    item(
+                        icon = {
+                            Icon(
+                                item.icon,
+                                contentDescription = item.label
+                            )
+                        },
+                        label = { Text(item.label) },
+                        selected = item == currentDestination,
+                        onClick = { currentDestination = item }
+                    )
+                }
+            }
+        ) {
+            when (currentDestination) {
+                AppDestinations.HOME -> HomeScreen(activity, onConfigureCoreUrl = {
+                    currentDestination = AppDestinations.SETTINGS
+                })
+                AppDestinations.VERIFY -> VerifyScreen(activity, promptManager)
+                AppDestinations.SETTINGS -> SettingsScreen(activity)
+            }
         }
     }
 }
