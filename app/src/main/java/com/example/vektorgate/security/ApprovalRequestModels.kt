@@ -25,5 +25,6 @@ class ApprovalResponse(
     val decision: String,
     val timestamp: Long,
     val signature: String,
-    val public_key: String
+    val public_key: String,
+    val payload_hash: String
 )

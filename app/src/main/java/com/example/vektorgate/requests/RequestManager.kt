@@ -21,7 +21,6 @@ class RequestManager(context: Context) {
 
     private val requestDao = db.approvalRequestDao()
 
-    @OptIn(InternalSerializationApi::class)
     suspend fun insertRequest(request: ApprovalRequest) {
         val requestEntity = ApprovalRequestEntity(
             requestId = request.requestId,
@@ -40,7 +39,6 @@ class RequestManager(context: Context) {
         Log.i("RequestManager", "Inserted request with id ${request.requestId}")
     }
 
-    @OptIn(InternalSerializationApi::class)
     suspend fun getPendingRequests(): List<ApprovalRequest> {
         val pendingRequests = requestDao.getPending()
         val result = mutableListOf<ApprovalRequest>()
@@ -52,7 +50,6 @@ class RequestManager(context: Context) {
         return result
     }
 
-    @OptIn(InternalSerializationApi::class)
     fun getPendingRequestsFlow(): Flow<List<ApprovalRequest>> {
         return requestDao.getPendingFlow().map { entities ->
             entities.map { entity ->
@@ -61,19 +58,16 @@ class RequestManager(context: Context) {
         }
     }
 
-    @OptIn(InternalSerializationApi::class)
     suspend fun getById(id: String): ApprovalRequest? {
         val requestEntity = requestDao.getById(id) ?: return null;
 
         return requestFromEntity(requestEntity)
     }
 
-    @OptIn(InternalSerializationApi::class)
     suspend fun updateRequestState(id: String, state: String) {
         requestDao.updateState(id, state)
     }
 
-    @OptIn(InternalSerializationApi::class)
     fun requestFromEntity(request: ApprovalRequestEntity): ApprovalRequest {
         return ApprovalRequest(
             type = request.type,

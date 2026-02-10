@@ -1,7 +1,6 @@
 package com.example.vektorgate.security
 
 import com.example.vektorgate.security.biometric.BiometricPromptManager
-import kotlinx.serialization.InternalSerializationApi
 import java.time.LocalDateTime
 
 class ApprovalHandler(
@@ -12,7 +11,6 @@ class ApprovalHandler(
     /**
      * Validates the request based on basic security rules.
      */
-    @OptIn(InternalSerializationApi::class)
     fun validateRequest(request: ApprovalRequest): Pair<Boolean, String?> {
         if (request.expiresAt < LocalDateTime.now()) {
             return false to "Request has expired."
@@ -30,7 +28,6 @@ class ApprovalHandler(
     /**
      * Starts the biometric signing process.
      */
-    @OptIn(InternalSerializationApi::class)
     fun approveRequest(
         request: ApprovalRequest,
         onError: (String) -> Unit
@@ -58,7 +55,6 @@ class ApprovalHandler(
      * Finalizes the response. We sign a combination of the nonce and request_id 
      * to ensure the signature is unique to this specific request.
      */
-    @OptIn(InternalSerializationApi::class)
     fun processResult(
         result: BiometricPromptManager.BiometricResult,
         request: ApprovalRequest,
@@ -67,20 +63,22 @@ class ApprovalHandler(
         if (result is BiometricPromptManager.BiometricResult.AuthenticationSuccess) {
             val unlockedSignature = result.cryptoObject?.signature ?: return null
 
-            val dataToSign = "${request.requestId}|${request.nonce}|${request.payloadHash}"
+            val timestamp = System.currentTimeMillis() / 1000
+            val dataToSign = "${request.requestId}|${request.nonce}|${request.payloadHash}|$timestamp"
             
             val signatureBase64 = securityManager.signData(
                 unlockedSignature, 
-                dataToSign.toByteArray()
+                dataToSign.toByteArray(Charsets.UTF_8)
             )
 
             return ApprovalResponse(
                 request_id = request.requestId,
                 decision = "approve",
-                timestamp = System.currentTimeMillis() / 1000,
+                timestamp = timestamp,
                 signature = signatureBase64,
                 public_key = securityManager.getPublicKeyBase64() ?: "",
-                device_id = deviceId
+                device_id = deviceId,
+                payload_hash = request.payloadHash // echo the hash so server can validate
             )
         }
         return null
