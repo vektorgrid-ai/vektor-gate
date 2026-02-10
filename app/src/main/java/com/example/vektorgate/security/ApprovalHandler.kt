@@ -47,7 +47,6 @@ class ApprovalHandler(
             return
         }
 
-        // We show the human exactly what they are approving
         biometricPromptManager.showBiometricPrompt(
             title = "Confirm Approval",
             description = "Action: ${request.tool.description}\nRisk: ${request.tool.riskLevel.uppercase()}",

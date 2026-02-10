@@ -27,7 +27,6 @@ import com.example.vektorgate.security.ApprovalRequest
 import com.example.vektorgate.security.ApprovalResponse
 import com.example.vektorgate.security.SecurityManager
 import com.example.vektorgate.security.biometric.BiometricPromptManager
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.json.Json

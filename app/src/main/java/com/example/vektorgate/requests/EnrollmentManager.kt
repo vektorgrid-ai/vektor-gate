@@ -65,7 +65,7 @@ class EnrollmentManager(
                     Log.e("EnrollmentManager", "Failed to enroll: ${response.code}")
                     return@withContext ""
                 }
-                val responseBody = response.body?.string() ?: ""
+                val responseBody = response.body.string()
                 val enrollmentResponse = Json.decodeFromString<EnrollmentResponse>(responseBody)
                 enrollmentResponse.device_id
             }
