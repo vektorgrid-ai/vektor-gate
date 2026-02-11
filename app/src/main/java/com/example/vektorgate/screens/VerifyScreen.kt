@@ -43,7 +43,7 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
     val coreUrl by settingsManager.coreUrl.collectAsState(initial = "")
     val deviceId by settingsManager.deviceId.collectAsState()
     
-    val manager = remember { RequestManager(activity) }
+    val manager = remember { RequestManager.getInstance(activity) }
     val pending by manager.getPendingRequestsFlow().collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
     

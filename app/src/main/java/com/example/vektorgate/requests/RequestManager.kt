@@ -9,11 +9,10 @@ import com.example.vektorgate.requests.db.ApprovalRequestEntity
 import com.example.vektorgate.security.ToolInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.serialization.InternalSerializationApi
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
-class RequestManager(context: Context) {
+class RequestManager private constructor(context: Context) {
     private val db = Room.databaseBuilder(
         context.applicationContext,
         ApprovalRequestDatabase::class.java, "approval_requests"
@@ -81,5 +80,18 @@ class RequestManager(context: Context) {
             nonce = request.nonce,
             expiresAt = LocalDateTime.ofEpochSecond(request.expiresAt, 0, ZoneOffset.UTC)
         )
+    }
+
+    companion object {
+        @Volatile
+        private var INSTANCE: RequestManager? = null
+
+        fun getInstance(context: Context): RequestManager {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: RequestManager(context.applicationContext).also {
+                    INSTANCE = it
+                }
+            }
+        }
     }
 }

@@ -70,7 +70,7 @@ class FirebaseRequestHandler : FirebaseMessagingService() {
     }
 
     private fun handleData(payload: Map<String, String>) {
-        val manager = RequestManager(this)
+        val manager = RequestManager.getInstance(this)
 
         val request = ApprovalRequest(
             type = "approval_request",
