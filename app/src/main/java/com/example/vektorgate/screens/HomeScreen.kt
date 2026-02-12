@@ -1,7 +1,6 @@
 package com.example.vektorgate.screens
 
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vektorgate.data.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
@@ -71,6 +72,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Dashboard(serverUrl: String, currentDeviceId: String) {
     var workers by remember { mutableStateOf<List<Worker>>(emptyList()) }
@@ -85,6 +87,7 @@ fun Dashboard(serverUrl: String, currentDeviceId: String) {
 
     val client = remember { OkHttpClient() }
     val json = remember { Json { ignoreUnknownKeys = true } }
+    val scope = rememberCoroutineScope()
 
     val fetchData = suspend {
         try {
@@ -125,85 +128,100 @@ fun Dashboard(serverUrl: String, currentDeviceId: String) {
         fetchData()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+    PullToRefreshBox(
+        isRefreshing = isLoading,
+        onRefresh = { scope.launch { fetchData() } },
+        modifier = Modifier.fillMaxSize()
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp, top = 24.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                "Vektor Gate Dashboard",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            IconButton(onClick = { fetchData }) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-            }
-        }
-
-        if (isLoading) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        } else if (errorMessage != null) {
-            Text("Error: $errorMessage", color = MaterialTheme.colorScheme.error)
-        } else {
-            health?.let {
-                ServerHealthSection(it)
-            }
-
-            DashboardSection(
-                title = "Workers",
-                icon = Icons.Default.Build,
-                count = workers.size
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp, top = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                workers.forEach { worker ->
-                    DashboardItem(
-                        title = worker.workerId,
-                        subtitle = "Type: ${worker.type}",
-                        caption = "Last seen: ${formatTimestamp(worker.lastSeen)}"
-                    )
+                Text(
+                    "Vektor Gate Dashboard",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                IconButton(onClick = { scope.launch { fetchData() } }) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                 }
             }
 
-            DashboardSection(
-                title = "Connected Companions",
-                icon = Icons.Default.Phone,
-                count = companions.size
-            ) {
-                companions.forEach { companion ->
-                    val isThisDevice = companion.deviceId == currentDeviceId
-                    DashboardItem(
-                        title = if (isThisDevice) "${companion.deviceName} (This Device)" else companion.deviceName,
-                        subtitle = if (companion.isApproved) "Approved" else "Pending Approval",
-                        caption = "ID: ${companion.deviceId.take(8)}...",
-                        highlight = isThisDevice
+            if (isLoading && workers.isEmpty() && health == null) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else if (errorMessage != null && workers.isEmpty() && health == null) {
+                Text("Error: $errorMessage", color = MaterialTheme.colorScheme.error)
+            } else {
+                if (errorMessage != null) {
+                    Text(
+                        "Update failed: $errorMessage",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
-            }
 
-            DashboardSection(
-                title = "Voice Satellites",
-                icon = Icons.Default.LocationOn,
-                count = satellites.size
-            ) {
-                satellites.forEach { satellite ->
-                    DashboardItem(
-                        title = satellite.deviceName,
-                        subtitle = "State: ${satellite.connectionState}",
-                        caption = "ID: ${satellite.connectionId.take(8)}..."
-                    )
+                health?.let {
+                    ServerHealthSection(it)
                 }
-            }
 
-            LogsSection(
-                logs = logs,
-                searchQuery = logSearchQuery,
-                onSearchQueryChange = { logSearchQuery = it }
-            )
+                DashboardSection(
+                    title = "Workers",
+                    icon = Icons.Default.Build,
+                    count = workers.size
+                ) {
+                    workers.forEach { worker ->
+                        DashboardItem(
+                            title = worker.workerId,
+                            subtitle = "Type: ${worker.type}",
+                            caption = "Last seen: ${formatTimestamp(worker.lastSeen)}"
+                        )
+                    }
+                }
+
+                DashboardSection(
+                    title = "Connected Companions",
+                    icon = Icons.Default.Phone,
+                    count = companions.size
+                ) {
+                    companions.forEach { companion ->
+                        val isThisDevice = companion.deviceId == currentDeviceId
+                        DashboardItem(
+                            title = if (isThisDevice) "${companion.deviceName} (This Device)" else companion.deviceName,
+                            subtitle = if (companion.isApproved) "Approved" else "Pending Approval",
+                            caption = "ID: ${companion.deviceId.take(8)}...",
+                            highlight = isThisDevice
+                        )
+                    }
+                }
+
+                DashboardSection(
+                    title = "Voice Satellites",
+                    icon = Icons.Default.LocationOn,
+                    count = satellites.size
+                ) {
+                    satellites.forEach { satellite ->
+                        DashboardItem(
+                            title = satellite.deviceName,
+                            subtitle = "State: ${satellite.connectionState}",
+                            caption = "ID: ${satellite.connectionId.take(8)}..."
+                        )
+                    }
+                }
+
+                LogsSection(
+                    logs = logs,
+                    searchQuery = logSearchQuery,
+                    onSearchQueryChange = { logSearchQuery = it }
+                )
+            }
         }
     }
 }
