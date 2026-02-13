@@ -20,7 +20,7 @@ data class WorkerCapabilities(
 
 @Serializable
 data class Companion(
-    @SerialName("device_id") val deviceId: String,
+    @SerialName("device_id") val truncDeviceId: String,
     @SerialName("device_name") val deviceName: String,
     @SerialName("is_approved") val isApproved: Boolean,
     @SerialName("created_at") val createdAt: String

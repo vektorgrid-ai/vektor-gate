@@ -192,11 +192,11 @@ fun Dashboard(serverUrl: String, currentDeviceId: String) {
                     count = companions.size
                 ) {
                     companions.forEach { companion ->
-                        val isThisDevice = companion.deviceId == currentDeviceId
+                        val isThisDevice = currentDeviceId.startsWith(companion.truncDeviceId)
                         DashboardItem(
                             title = if (isThisDevice) "${companion.deviceName} (This Device)" else companion.deviceName,
                             subtitle = if (companion.isApproved) "Approved" else "Pending Approval",
-                            caption = "ID: ${companion.deviceId.take(8)}...",
+                            caption = "ID: ${companion.truncDeviceId}...",
                             highlight = isThisDevice
                         )
                     }
