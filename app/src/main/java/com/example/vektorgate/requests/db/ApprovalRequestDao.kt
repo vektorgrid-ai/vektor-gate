@@ -23,5 +23,5 @@ interface ApprovalRequestDao {
     fun getPendingFlow(): Flow<List<ApprovalRequestEntity>>
 
     @Query("UPDATE approval_request SET state = :state WHERE request_id = :id")
-    suspend fun updateState(id: String, state: String): Unit
+    suspend fun updateState(id: String, state: String)
 }

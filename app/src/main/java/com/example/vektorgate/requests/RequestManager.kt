@@ -58,7 +58,7 @@ class RequestManager private constructor(context: Context) {
     }
 
     suspend fun getById(id: String): ApprovalRequest? {
-        val requestEntity = requestDao.getById(id) ?: return null;
+        val requestEntity = requestDao.getById(id) ?: return null
 
         return requestFromEntity(requestEntity)
     }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -304,7 +305,7 @@ fun LogsSection(
 
     DashboardSection(
         title = "Recent Logs",
-        icon = Icons.Default.List,
+        icon = Icons.AutoMirrored.Filled.List,
         count = filteredLogs.size
     ) {
         OutlinedTextField(
@@ -372,7 +373,7 @@ fun formatTimestamp(timestamp: String): String {
     return try {
         val dt = OffsetDateTime.parse(timestamp)
         dt.format(DateTimeFormatter.ofPattern("MMM dd, HH:mm:ss"))
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         timestamp
     }
 }

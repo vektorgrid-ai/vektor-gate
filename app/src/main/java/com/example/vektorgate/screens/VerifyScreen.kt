@@ -28,14 +28,12 @@ import com.example.vektorgate.security.ApprovalResponse
 import com.example.vektorgate.security.SecurityManager
 import com.example.vektorgate.security.biometric.BiometricPromptManager
 import kotlinx.coroutines.launch
-import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.json.Json
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 
-@OptIn(InternalSerializationApi::class)
 @Composable
 fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptManager) {
     val settingsManager = remember { SettingsManager.getInstance(activity) }
@@ -150,7 +148,6 @@ fun VerifyScreen(activity: AppCompatActivity, promptManager: BiometricPromptMana
     }
 }
 
-@OptIn(InternalSerializationApi::class)
 fun sendResponseToServer(url: String, response: ApprovalResponse) {
     val client = OkHttpClient()
     val body = Json.encodeToString(response).toRequestBody("application/json".toMediaTypeOrNull())
