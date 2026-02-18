@@ -21,12 +21,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.HourglassEmpty
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -163,7 +163,7 @@ fun RelayButton(
     ) {
         val icon: ImageVector = when (status) {
             RelayWebsocketClient.RelayStatus.STREAMING_AUDIO -> Icons.Rounded.Mic
-            RelayWebsocketClient.RelayStatus.PLAYING_TTS -> Icons.Rounded.VolumeUp
+            RelayWebsocketClient.RelayStatus.PLAYING_TTS -> Icons.AutoMirrored.Rounded.VolumeUp
             RelayWebsocketClient.RelayStatus.PROCESSING -> Icons.Rounded.HourglassEmpty
             RelayWebsocketClient.RelayStatus.DISCONNECTED -> Icons.Rounded.CloudOff
             RelayWebsocketClient.RelayStatus.CONNECTING -> Icons.Rounded.Refresh

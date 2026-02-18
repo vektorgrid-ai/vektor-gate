@@ -98,7 +98,7 @@ class FirebaseRequestHandler : FirebaseMessagingService() {
         CoroutineScope(Dispatchers.IO).launch {
             SettingsManager.getInstance(applicationContext).saveFirebaseToken(token)
             
-            // TODO: Implement the network call to your local server here
+            // TODO: Implement the network call to your local server here (NewTokenRequest)
             // e.g. repository.updatePushToken(token)
         }
     }
