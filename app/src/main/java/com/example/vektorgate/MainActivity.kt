@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -42,6 +43,7 @@ import com.example.vektorgate.data.ConnectionStatus
 import com.example.vektorgate.data.SettingsManager
 import com.example.vektorgate.requests.EnrollmentManager
 import com.example.vektorgate.screens.HomeScreen
+import com.example.vektorgate.screens.RelayScreen
 import com.example.vektorgate.screens.SettingsScreen
 import com.example.vektorgate.screens.VerifyScreen
 import com.example.vektorgate.security.biometric.BiometricPromptManager
@@ -169,6 +171,7 @@ fun VektorGateApp(activity: AppCompatActivity, settingsManager: SettingsManager)
                     currentDestination = AppDestinations.SETTINGS
                 })
                 AppDestinations.VERIFY -> VerifyScreen(activity, promptManager)
+                AppDestinations.RELAY -> RelayScreen(activity)
                 AppDestinations.SETTINGS -> SettingsScreen(activity)
             }
         }
@@ -182,5 +185,6 @@ enum class AppDestinations(
 ) {
     HOME("Dashboard", Icons.Default.Home, true),
     VERIFY("Verify", Icons.Default.Lock, true),
+    RELAY("Relay", Icons.Default.Phone, true),
     SETTINGS("Settings", Icons.Default.Settings, true),
 }
