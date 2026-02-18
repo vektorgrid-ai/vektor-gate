@@ -29,7 +29,7 @@ class RelayAudioFormat(
 @Serializable
 class SessionStartMessage(
     val type: String,
-    val timestamp: Int,
+    val timestamp: Long,
     val session_id: String
 )
 @Serializable

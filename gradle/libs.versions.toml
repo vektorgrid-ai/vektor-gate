@@ -13,13 +13,14 @@ activityCompose = "1.8.0"
 kotlin = "2.0.21"
 composeBom = "2024.09.00"
 appcompat = "1.7.1"
+materialIconsExtended = "1.7.8"
 okhttp = "5.3.2"
 roomVersion = "2.8.4"
-firebaseMessagingKtx = "25.0.1"
 workRuntimeKtx = "2.11.1"
 
 [libraries]
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
+androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomVersion" }

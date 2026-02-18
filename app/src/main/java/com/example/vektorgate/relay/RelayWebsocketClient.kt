@@ -6,7 +6,11 @@ import androidx.annotation.RequiresPermission
 import com.example.vektorgate.relay.audio.AudioManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -18,12 +22,14 @@ import okhttp3.WebSocketListener
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
 
-class RelayWebsocketClient {
+object RelayWebsocketClient {
     enum class RelayStatus {
         DISCONNECTED,
+        CONNECTING,
         CONNECTED,
         READY,
         STREAMING_AUDIO,
+        PROCESSING,
         PLAYING_TTS
     }
     private class RelayWebsocketListener(val client: RelayWebsocketClient) : WebSocketListener() {
@@ -57,7 +63,6 @@ class RelayWebsocketClient {
                 }
                 "tts.start" -> {
                     Log.d(TAG, "TTS playback started")
-                    // TODO: set audio format
                     client.setStatus(RelayStatus.PLAYING_TTS)
                 }
                 "tts.end" -> {
@@ -70,21 +75,27 @@ class RelayWebsocketClient {
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
             Log.d(TAG, "Socket closing with code $code and reason $reason")
+            client.setStatus(RelayStatus.DISCONNECTED)
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             Log.e(TAG, "Socket failure: ${t.message}")
+            client.setStatus(RelayStatus.DISCONNECTED)
         }
     }
 
     private var socket: WebSocket? = null
-    private lateinit var audioManager: AudioManager
-    private var status: RelayStatus = RelayStatus.DISCONNECTED
+    private var audioManager: AudioManager? = null
+    private val _status = MutableStateFlow(RelayStatus.DISCONNECTED)
+    val status: StateFlow<RelayStatus> = _status.asStateFlow()
+    
     private var sessionId: String? = null
-    private var ttsBuffer: ByteArray = emptyArray<Byte>().toByteArray()
-    private var recordBuffer: ByteArray = emptyArray<Byte>().toByteArray()
+    private var ttsBuffer: ByteArray = ByteArray(0)
 
     fun connect(url: String) {
+        if (_status.value != RelayStatus.DISCONNECTED) return
+        _status.value = RelayStatus.CONNECTING
+        
         val request = Request.Builder()
             .url(url)
             .build()
@@ -94,9 +105,10 @@ class RelayWebsocketClient {
         socket = client.newWebSocket(request, listener)
         client.dispatcher.executorService.shutdown()
     }
+
     fun disconnect() {
         socket?.close(1000, null)
-        status = RelayStatus.DISCONNECTED
+        _status.value = RelayStatus.DISCONNECTED
         sessionId = null
         socket = null
     }
@@ -107,13 +119,15 @@ class RelayWebsocketClient {
         audioManager = AudioManager()
 
         val scope = CoroutineScope(Dispatchers.IO)
-        audioManager.startRecording(scope, onDataReceived = { data ->
+        audioManager?.startRecording(scope, onDataReceived = { data ->
             sendAudioBytes(data)
         })
     }
+
     fun endSession() {
-        audioManager.stopRecording()
+        audioManager?.stopRecording()
         sendAudioEndMessage()
+        _status.value = RelayStatus.PROCESSING
     }
 
     private fun sendHelloMessage() {
@@ -137,49 +151,53 @@ class RelayWebsocketClient {
             )
         )
 
-        val json = Json.encodeToString(message)
+        val json = Json.encodeToString(HelloMessage.serializer(), message)
         socket?.send(json)
     }
+
     private fun sendSessionStartMessage() {
         val message = SessionStartMessage(
             type = "session.start",
-            timestamp = 1234567890,
+            timestamp = System.currentTimeMillis() / 1000,
             session_id = "testing-session"
         )
 
-        val json = Json.encodeToString(message)
+        val json = Json.encodeToString(SessionStartMessage.serializer(), message)
         socket?.send(json)
     }
+
     private fun sendAudioBytes(data: ByteArray) {
         socket?.send(data.toByteString())
     }
+
     private fun sendAudioEndMessage() {
         val message = AudioEndMessage(
             type = "audio.end",
-            session_id = sessionId ?: throw IllegalStateException("Session ID not set"),
-            reason = "reason"
+            session_id = sessionId ?: "testing-session",
+            reason = "user_ended"
         )
 
-        val json = Json.encodeToString(message)
+        val json = Json.encodeToString(AudioEndMessage.serializer(), message)
         socket?.send(json)
     }
 
     private fun playCollectedTts() {
         val manager = AudioManager()
+        val dataToPlay = ttsBuffer
+        ttsBuffer = ByteArray(0)
         CoroutineScope(Dispatchers.IO).launch {
-            manager.playAudio(ttsBuffer)
+            manager.playAudio(dataToPlay)
         }
     }
 
-    fun getStatus(): RelayStatus {
-        return status
-    }
     private fun setStatus(status: RelayStatus) {
-        this.status = status
+        _status.value = status
     }
+
     private fun setSessionId(id: String?) {
         sessionId = id
     }
+
     private fun addTtsData(data: ByteArray) {
         ttsBuffer += data
     }

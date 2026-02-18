@@ -51,7 +51,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.appcompat)
-    //implementation(libs.firebase.messaging.ktx)
     implementation(libs.firebase.messaging)
     implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.junit)
@@ -61,6 +60,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.datastore.preferences)
