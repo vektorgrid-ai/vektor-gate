@@ -38,7 +38,7 @@ fun HomeScreen(
     val settingsManager = SettingsManager.getInstance(activity)
     val coreUrl by settingsManager.coreUrl.collectAsState(initial = "")
     val connectionStatus by settingsManager.connectionStatus.collectAsState()
-    val currentDeviceId by settingsManager.deviceId.collectAsState()
+    val currentDeviceId by settingsManager.deviceId.collectAsState(initial = "")
 
     Column(
         modifier = Modifier

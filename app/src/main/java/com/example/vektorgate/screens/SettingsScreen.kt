@@ -48,7 +48,7 @@ fun rememberSettingsScreenState(
     var isDeviceNameInitialized by remember { mutableStateOf(false) }
 
     val firebaseToken by manager.firebaseToken.collectAsState(initial = "Loading...")
-    val deviceId by manager.deviceId.collectAsState()
+    val deviceId by manager.deviceId.collectAsState(initial = "Not generated")
     val connectionStatus by manager.connectionStatus.collectAsState()
 
     LaunchedEffect(storedUrl) {

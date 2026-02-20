@@ -86,7 +86,6 @@ class MainActivity : AppCompatActivity() {
                         enrollmentManager.enroll(coreUrl, deviceName, firebaseToken)
                     } else {
                         settingsManager.setConnectionStatus(ConnectionStatus.DISCONNECTED)
-                        settingsManager.setDeviceId(null)
                     }
                 }
         }

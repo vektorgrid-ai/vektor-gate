@@ -27,6 +27,7 @@ class SettingsManager private constructor(private val dataStore: DataStore<Prefe
         private val CORE_URL_KEY = stringPreferencesKey("core_url")
         private val DEVICE_NAME_KEY = stringPreferencesKey("device_name")
         private val FIREBASE_TOKEN_KEY = stringPreferencesKey("firebase_token")
+        private val DEVICE_ID_KEY = stringPreferencesKey("device_id")
 
         @Volatile
         private var INSTANCE: SettingsManager? = null
@@ -55,10 +56,12 @@ class SettingsManager private constructor(private val dataStore: DataStore<Prefe
             preferences[FIREBASE_TOKEN_KEY] ?: "Not Set"
         }
 
-    // In-memory state as it's regenerated every startup/enrollment
-    private val _deviceId = MutableStateFlow<String?>(null)
-    val deviceId: StateFlow<String?> = _deviceId.asStateFlow()
+    val deviceId: Flow<String?> = dataStore.data
+        .map { preferences ->
+            preferences[DEVICE_ID_KEY]
+        }
 
+    // Store connection status in-memory
     private val _connectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     val connectionStatus: StateFlow<ConnectionStatus> = _connectionStatus.asStateFlow()
 
@@ -81,8 +84,10 @@ class SettingsManager private constructor(private val dataStore: DataStore<Prefe
         }
     }
 
-    fun setDeviceId(id: String?) {
-        _deviceId.value = id
+    suspend fun saveDeviceId(id: String) {
+        dataStore.edit { preferences ->
+            preferences[DEVICE_ID_KEY] = id
+        }
     }
 
     fun setConnectionStatus(status: ConnectionStatus) {

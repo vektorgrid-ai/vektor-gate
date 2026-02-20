@@ -6,7 +6,8 @@ import kotlinx.serialization.Serializable
 class EnrollmentRequest (
     val device_name: String,
     val public_key: String,
-    val firebase_token: String
+    val firebase_token: String,
+    val device_id: String
 )
 @Serializable
 data class EnrollmentResponse(
