@@ -12,8 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.vektorgate.data.ConnectionStatus
@@ -130,6 +132,45 @@ fun SettingsScreen(activity: AppCompatActivity) {
 }
 
 @Composable
+fun TapToRevealText(
+    text: String,
+    label: String,
+    activity: AppCompatActivity,
+    fontSize: TextUnit = 12.sp
+) {
+    var isRevealed by remember { mutableStateOf(false) }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                if (!isRevealed) {
+                    isRevealed = true
+                } else {
+                    val clipboardManager: ClipboardManager =
+                        activity.getSystemService(AppCompatActivity.CLIPBOARD_SERVICE) as ClipboardManager
+                    val clipData = ClipData.newPlainText(label, text)
+                    clipboardManager.setPrimaryClip(clipData)
+                    Toast.makeText(activity, "$label copied", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .padding(vertical = 4.dp)
+    ) {
+        Text(
+            text = if (isRevealed) text else "••••••••••••••••••••••••••••••••",
+            fontSize = fontSize,
+            fontFamily = FontFamily.Monospace,
+            lineHeight = fontSize * 1.2
+        )
+        Text(
+            text = if (isRevealed) "Tap to copy" else "Tap to reveal",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
+    }
+}
+
+@Composable
 fun GeneralSettings(activity: AppCompatActivity, state: SettingsScreenState) {
     Column {
         Text("General Settings", fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -158,29 +199,11 @@ fun GeneralSettings(activity: AppCompatActivity, state: SettingsScreenState) {
         Spacer(modifier = Modifier.height(16.dp))
         
         Text("Device ID:", style = MaterialTheme.typography.labelMedium)
-        if (state.connectionStatus == ConnectionStatus.CONNECTED && state.deviceId != null) {
-            Text(
-                text = state.deviceId,
-                fontSize = 12.sp,
-                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .clickable {
-                        val clipboardManager: ClipboardManager =
-                            activity.getSystemService(AppCompatActivity.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clipData = ClipData.newPlainText("Device ID", state.deviceId)
-                        clipboardManager.setPrimaryClip(clipData)
-                        Toast.makeText(activity, "Device ID copied", Toast.LENGTH_SHORT).show()
-                    }
-            )
-        } else {
-            Text(
-                text = if (state.connectionStatus == ConnectionStatus.CONNECTING) "Connecting..." else "Not connected to server",
-                color = MaterialTheme.colorScheme.error,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
+        TapToRevealText(
+            text = state.deviceId ?: "Not generated",
+            label = "Device ID",
+            activity = activity
+        )
     }
 }
 
@@ -190,19 +213,11 @@ fun FirebaseSettings(activity: AppCompatActivity, state: SettingsScreenState) {
         Text("Firebase Messaging", fontSize = 20.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         Text("Registration Token:", style = MaterialTheme.typography.labelMedium)
-        Text(
+        TapToRevealText(
             text = state.firebaseToken,
-            fontSize = 10.sp,
-            lineHeight = 12.sp,
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-            modifier = Modifier.padding(top = 4.dp)
-                .clickable {
-                    val clipboardManager: ClipboardManager =
-                        activity.getSystemService(AppCompatActivity.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clipData = ClipData.newPlainText("Firebase Token", state.firebaseToken)
-                    clipboardManager.setPrimaryClip(clipData)
-                    Toast.makeText(activity, "Token copied", Toast.LENGTH_SHORT).show()
-                }
+            label = "Firebase Token",
+            activity = activity,
+            fontSize = 10.sp
         )
     }
 }
