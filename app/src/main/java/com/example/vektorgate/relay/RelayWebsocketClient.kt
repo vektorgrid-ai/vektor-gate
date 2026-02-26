@@ -83,6 +83,7 @@ object RelayWebsocketClient {
         }
     }
 
+    private val client = OkHttpClient()
     private var socket: WebSocket? = null
     private var audioManager: AudioManager? = null
     private val _status = MutableStateFlow(RelayStatus.DISCONNECTED)
@@ -100,9 +101,7 @@ object RelayWebsocketClient {
             .build()
 
         val listener = RelayWebsocketListener(this)
-        val client = OkHttpClient()
         socket = client.newWebSocket(request, listener)
-        client.dispatcher.executorService.shutdown()
     }
 
     fun disconnect() {

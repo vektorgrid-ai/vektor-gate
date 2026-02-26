@@ -48,6 +48,7 @@ import com.example.vektorgate.data.SettingsManager
 import com.example.vektorgate.relay.RelayWebsocketClient
 import com.example.vektorgate.relay.audio.AudioManager
 import kotlinx.coroutines.launch
+import com.example.vektorgate.relay.RelayWebsocketClient.RelayStatus.*
 
 @Composable
 fun RelayScreen(activity: ComponentActivity) {
@@ -59,7 +60,7 @@ fun RelayScreen(activity: ComponentActivity) {
 
     // Implicitly handle connection when URL is available or changes
     LaunchedEffect(coreUrl) {
-        if (coreUrl.isNotEmpty() && status == RelayWebsocketClient.RelayStatus.DISCONNECTED) {
+        if (coreUrl.isNotEmpty() && status == DISCONNECTED) {
             client.connect("$coreUrl/ws/satellite")
         }
     }
@@ -80,17 +81,17 @@ fun RelayScreen(activity: ComponentActivity) {
                 status = status,
                 onClick = @SuppressLint("MissingPermission") {
                     when (status) {
-                        RelayWebsocketClient.RelayStatus.DISCONNECTED -> {
+                        DISCONNECTED -> {
                             client.connect("$coreUrl/ws/satellite")
                         }
-                        RelayWebsocketClient.RelayStatus.READY, RelayWebsocketClient.RelayStatus.CONNECTED -> {
+                        READY, CONNECTED -> {
                             scope.launch {
                                 if (AudioManager.ensureRecordingPermissionGranted(activity)) {
                                     client.startSession()
                                 }
                             }
                         }
-                        RelayWebsocketClient.RelayStatus.STREAMING_AUDIO -> {
+                        STREAMING_AUDIO -> {
                             client.endSession()
                         }
                         else -> {
@@ -113,20 +114,20 @@ fun RelayButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isActive = status == RelayWebsocketClient.RelayStatus.STREAMING_AUDIO || 
-                   status == RelayWebsocketClient.RelayStatus.PLAYING_TTS
+    val isActive = status == STREAMING_AUDIO || 
+                   status == PLAYING_TTS
     
-    val isDeactivated = status == RelayWebsocketClient.RelayStatus.PROCESSING || 
-                        status == RelayWebsocketClient.RelayStatus.CONNECTING
+    val isDeactivated = status == PROCESSING || 
+                        status == CONNECTING
 
     // Animations
     val backgroundColor by animateColorAsState(
         targetValue = when (status) {
-            RelayWebsocketClient.RelayStatus.STREAMING_AUDIO -> Color(0xFFE53935) // Red
-            RelayWebsocketClient.RelayStatus.PLAYING_TTS -> Color(0xFF1E88E5) // Blue
-            RelayWebsocketClient.RelayStatus.PROCESSING -> Color.Gray
-            RelayWebsocketClient.RelayStatus.DISCONNECTED -> Color(0xFF546E7A) // Slate
-            RelayWebsocketClient.RelayStatus.CONNECTING -> Color(0xFFB0BEC5)
+            STREAMING_AUDIO -> Color(0xFFE53935) // Red
+            PLAYING_TTS -> Color(0xFF1E88E5) // Blue
+            PROCESSING -> Color.Gray
+            DISCONNECTED -> Color(0xFF546E7A) // Slate
+            CONNECTING -> Color(0xFFB0BEC5)
             else -> MaterialTheme.colorScheme.primary
         },
         animationSpec = tween(500),
@@ -162,11 +163,11 @@ fun RelayButton(
         contentAlignment = Alignment.Center
     ) {
         val icon: ImageVector = when (status) {
-            RelayWebsocketClient.RelayStatus.STREAMING_AUDIO -> Icons.Rounded.Mic
-            RelayWebsocketClient.RelayStatus.PLAYING_TTS -> Icons.AutoMirrored.Rounded.VolumeUp
-            RelayWebsocketClient.RelayStatus.PROCESSING -> Icons.Rounded.HourglassEmpty
-            RelayWebsocketClient.RelayStatus.DISCONNECTED -> Icons.Rounded.CloudOff
-            RelayWebsocketClient.RelayStatus.CONNECTING -> Icons.Rounded.Refresh
+            STREAMING_AUDIO -> Icons.Rounded.Mic
+            PLAYING_TTS -> Icons.AutoMirrored.Rounded.VolumeUp
+            PROCESSING -> Icons.Rounded.HourglassEmpty
+            DISCONNECTED -> Icons.Rounded.CloudOff
+            CONNECTING -> Icons.Rounded.Refresh
             else -> Icons.Rounded.PlayArrow
         }
 
@@ -182,16 +183,16 @@ fun RelayButton(
 @Composable
 fun StatusIndicator(status: RelayWebsocketClient.RelayStatus) {
     val text = when (status) {
-        RelayWebsocketClient.RelayStatus.DISCONNECTED -> "Disconnected"
-        RelayWebsocketClient.RelayStatus.CONNECTING -> "Connecting..."
-        RelayWebsocketClient.RelayStatus.CONNECTED, RelayWebsocketClient.RelayStatus.READY -> "Ready to Talk"
-        RelayWebsocketClient.RelayStatus.STREAMING_AUDIO -> "Listening..."
-        RelayWebsocketClient.RelayStatus.PROCESSING -> "Processing..."
-        RelayWebsocketClient.RelayStatus.PLAYING_TTS -> "Speaking..."
+        DISCONNECTED -> "Disconnected"
+        CONNECTING, CONNECTED -> "Connecting..."
+        READY -> "Ready to Talk"
+        STREAMING_AUDIO -> "Listening..."
+        PROCESSING -> "Processing..."
+        PLAYING_TTS -> "Speaking..."
     }
 
     val color by animateColorAsState(
-        targetValue = if (status == RelayWebsocketClient.RelayStatus.STREAMING_AUDIO) 
+        targetValue = if (status == STREAMING_AUDIO) 
             Color(0xFFE53935) else MaterialTheme.colorScheme.onSurface,
         label = "textColor"
     )
