@@ -96,7 +96,7 @@ fun Dashboard(serverUrl: String, currentDeviceId: String) {
             errorMessage = null
 
             withContext(Dispatchers.IO) {
-                val workersReq = Request.Builder().url("$serverUrl/worker").build()
+                val workersReq = Request.Builder().url("$serverUrl/worker/alive").build()
                 val companionsReq = Request.Builder().url("$serverUrl/companion").build()
                 val satellitesReq = Request.Builder().url("$serverUrl/satellite").build()
                 val healthReq = Request.Builder().url("$serverUrl/health").build()

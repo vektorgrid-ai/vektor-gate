@@ -1,6 +1,7 @@
 package com.example.vektorgate.screens
 
 import android.annotation.SuppressLint
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
@@ -84,7 +85,7 @@ fun RelayScreen(activity: ComponentActivity) {
                         DISCONNECTED -> {
                             client.connect("$coreUrl/ws/satellite")
                         }
-                        READY, CONNECTED -> {
+                        READY -> {
                             scope.launch {
                                 if (AudioManager.ensureRecordingPermissionGranted(activity)) {
                                     client.startSession()
@@ -95,7 +96,7 @@ fun RelayScreen(activity: ComponentActivity) {
                             client.endSession()
                         }
                         else -> {
-                            // Button is deactivated for PROCESSING, CONNECTING, etc.
+                            // Button is deactivated for STARTING_SESSION, PROCESSING, CONNECTING, etc.
                         }
                     }
                 }
@@ -118,7 +119,10 @@ fun RelayButton(
                    status == PLAYING_TTS
     
     val isDeactivated = status == PROCESSING || 
-                        status == CONNECTING
+                        status == CONNECTING ||
+                        status == STARTING_SESSION
+
+    Log.v("RelayButton", "Status: $status, isActive: $isActive, isDeactivated: $isDeactivated")
 
     // Animations
     val backgroundColor by animateColorAsState(
@@ -163,6 +167,7 @@ fun RelayButton(
         contentAlignment = Alignment.Center
     ) {
         val icon: ImageVector = when (status) {
+            STARTING_SESSION -> Icons.Rounded.Refresh
             STREAMING_AUDIO -> Icons.Rounded.Mic
             PLAYING_TTS -> Icons.AutoMirrored.Rounded.VolumeUp
             PROCESSING -> Icons.Rounded.HourglassEmpty
@@ -186,6 +191,7 @@ fun StatusIndicator(status: RelayWebsocketClient.RelayStatus) {
         DISCONNECTED -> "Disconnected"
         CONNECTING, CONNECTED -> "Connecting..."
         READY -> "Ready to Talk"
+        STARTING_SESSION -> "Starting session..."
         STREAMING_AUDIO -> "Listening..."
         PROCESSING -> "Processing..."
         PLAYING_TTS -> "Speaking..."

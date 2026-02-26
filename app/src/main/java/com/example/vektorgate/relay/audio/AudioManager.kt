@@ -50,45 +50,52 @@ class AudioManager {
     }
     
     private var recordingJob: Job? = null
-    private var isRecording = false
+    private var activeRecorder: AudioRecord? = null
+    @Volatile
+    private var isRecordingRequested = false
 
     /**
      * Starts continuous recording. Audio data is delivered via the [onDataReceived] callback.
-     * This method is non-blocking and manages its own coroutine on [scope].
+     * [onDataReceived] is called with null when recording has fully stopped.
      */
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startRecording(
         scope: CoroutineScope,
         sampleRate: Int = 16000,
         fmt: Int = AudioFormat.ENCODING_PCM_16BIT,
-        onDataReceived: (ByteArray) -> Unit
+        onDataReceived: (ByteArray?) -> Unit
     ) {
-        if (isRecording) return
-        isRecording = true
+        if (isRecordingRequested || recordingJob?.isActive == true) {
+            Log.w(TAG, "Recording is already in progress or stopping, ignoring start request")
+            return
+        }
+        isRecordingRequested = true
         
         recordingJob = scope.launch(Dispatchers.IO) {
-            val bufferSize = AudioRecord.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                fmt
-            ) * 2
-            
-            val recorder = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                fmt,
-                bufferSize
-            )
-
-            val buffer = ByteArray(bufferSize)
+            var recorder: AudioRecord? = null
             try {
+                val bufferSize = AudioRecord.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    fmt
+                ) * 2
+                
+                recorder = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    sampleRate,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    fmt,
+                    bufferSize
+                )
+                activeRecorder = recorder
+
+                val buffer = ByteArray(bufferSize)
                 recorder.startRecording()
                 Log.d(TAG, "Recording started")
                 
-                while (isActive && isRecording) {
+                while (isActive && isRecordingRequested) {
                     val readResult = recorder.read(buffer, 0, bufferSize)
-                    if (readResult > 0) {
+                    if (readResult > 0 && isActive && isRecordingRequested) {
                         // Deliver a copy of the recorded data
                         onDataReceived(buffer.copyOf(readResult))
                     } else if (readResult < 0) {
@@ -99,10 +106,20 @@ class AudioManager {
             } catch (e: Exception) {
                 Log.e(TAG, "Error during recording", e)
             } finally {
-                recorder.stop()
-                recorder.release()
-                isRecording = false
-                Log.d(TAG, "Recording stopped")
+                Log.d(TAG, "Cleaning up recording resources...")
+                isRecordingRequested = false
+                try {
+                    recorder?.stop()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error stopping recorder", e)
+                }
+                recorder?.release()
+                if (activeRecorder == recorder) activeRecorder = null
+                
+                // Signal end to callback
+                onDataReceived(null)
+                
+                Log.d(TAG, "Recording stopped and resources released")
             }
         }
     }
@@ -111,9 +128,14 @@ class AudioManager {
      * Stops the current recording session.
      */
     fun stopRecording() {
-        isRecording = false
+        Log.d(TAG, "stopRecording called")
+        isRecordingRequested = false
         recordingJob?.cancel()
-        recordingJob = null
+        try {
+            activeRecorder?.stop()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error calling stop() on activeRecorder", e)
+        }
     }
 
     /**
@@ -154,9 +176,11 @@ class AudioManager {
             audioTrack.play()
             
             // Wait until the audio is actually finished playing
-            while (isActive && audioTrack.playbackHeadPosition < buffer.size) {
+            while (isActive && audioTrack.playbackHeadPosition < (buffer.size / 2)) { // Adjusted for 16-bit PCM (2 bytes per sample)
                 delay(10)
             }
+            // Give it a tiny bit more time to flush the buffer
+            delay(50)
         } catch (e: Exception) {
             Log.e(TAG, "Error playing audio", e)
         } finally {

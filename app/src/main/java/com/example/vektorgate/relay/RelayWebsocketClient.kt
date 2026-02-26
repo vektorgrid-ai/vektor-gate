@@ -20,22 +20,23 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
+import java.util.UUID
 
 object RelayWebsocketClient {
+    private const val TAG = "RelayWebsocketClient"
+
     enum class RelayStatus {
         DISCONNECTED,
         CONNECTING,
         CONNECTED,
         READY,
+        STARTING_SESSION,
         STREAMING_AUDIO,
         PROCESSING,
         PLAYING_TTS
     }
-    private class RelayWebsocketListener(val client: RelayWebsocketClient) : WebSocketListener() {
-        companion object {
-            private const val TAG = "RelayWebsocketListener"
-        }
 
+    private class RelayWebsocketListener(val client: RelayWebsocketClient) : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             Log.d(TAG, "Socket opened")
             client.setStatus(RelayStatus.CONNECTED)
@@ -48,27 +49,37 @@ object RelayWebsocketClient {
 
         override fun onMessage(webSocket: WebSocket, text: String) {
             Log.d(TAG, "Socket message received: $text")
-            val doc = Json.parseToJsonElement(text)
-            val type = doc.jsonObject["type"]?.jsonPrimitive?.content
-            when (type) {
-                "hello.ack" -> {
-                    Log.d(TAG, "Hello message acknowledged")
-                    client.setStatus(RelayStatus.READY)
+            try {
+                val doc = Json.parseToJsonElement(text)
+                val type = doc.jsonObject["type"]?.jsonPrimitive?.content
+                when (type) {
+                    "hello.ack" -> {
+                        Log.d(TAG, "Hello message acknowledged")
+                        client.setStatus(RelayStatus.READY)
+                    }
+                    "session.ack" -> {
+                        Log.d(TAG, "Session start acknowledged")
+                        val serverSessionId = doc.jsonObject["session_id"]?.jsonPrimitive?.content
+                        client.setSessionId(serverSessionId)
+                        client.setStatus(RelayStatus.STREAMING_AUDIO)
+                    }
+                    "tts.start" -> {
+                        Log.d(TAG, "TTS playback started")
+                        client.stopRecordingOnly()
+                        client.setStatus(RelayStatus.PLAYING_TTS)
+                    }
+                    "tts.end" -> {
+                        Log.d(TAG, "TTS playback ended")
+                        client.playCollectedTts()
+                    }
+                    "error" -> {
+                        val message = doc.jsonObject["message"]?.jsonPrimitive?.content
+                        Log.e(TAG, "Relay Error: $message")
+                        client.setStatus(RelayStatus.READY)
+                    }
                 }
-                "session.ack" -> {
-                    Log.d(TAG, "Session start acknowledged")
-                    client.setSessionId(doc.jsonObject["session_id"]?.jsonPrimitive?.content)
-                    client.setStatus(RelayStatus.STREAMING_AUDIO)
-                }
-                "tts.start" -> {
-                    Log.d(TAG, "TTS playback started")
-                    client.setStatus(RelayStatus.PLAYING_TTS)
-                }
-                "tts.end" -> {
-                    Log.d(TAG, "TTS playback ended")
-                    client.playCollectedTts()
-                    client.setStatus(RelayStatus.READY)
-                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing message", e)
             }
         }
 
@@ -83,9 +94,10 @@ object RelayWebsocketClient {
         }
     }
 
-    private val client = OkHttpClient()
+    private val httpClient = OkHttpClient()
     private var socket: WebSocket? = null
-    private var audioManager: AudioManager? = null
+    private val audioManager = AudioManager()
+    private val clientScope = CoroutineScope(Dispatchers.IO)
     private val _status = MutableStateFlow(RelayStatus.DISCONNECTED)
     val status: StateFlow<RelayStatus> = _status.asStateFlow()
     
@@ -101,11 +113,12 @@ object RelayWebsocketClient {
             .build()
 
         val listener = RelayWebsocketListener(this)
-        socket = client.newWebSocket(request, listener)
+        socket = httpClient.newWebSocket(request, listener)
     }
 
     fun disconnect() {
-        socket?.close(1000, null)
+        socket?.close(1000, "User disconnected")
+        audioManager.stopRecording()
         _status.value = RelayStatus.DISCONNECTED
         sessionId = null
         socket = null
@@ -113,19 +126,50 @@ object RelayWebsocketClient {
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startSession() {
-        sendSessionStartMessage()
-        audioManager = AudioManager()
+        if (_status.value != RelayStatus.READY) {
+            Log.w(TAG, "Cannot start session: status is ${_status.value}")
+            return
+        }
 
-        val scope = CoroutineScope(Dispatchers.IO)
-        audioManager?.startRecording(scope, onDataReceived = { data ->
-            sendAudioBytes(data)
+        audioManager.stopRecording()
+        ttsBuffer = ByteArray(0)
+
+        val newSessionId = "session-${UUID.randomUUID()}"
+        sessionId = newSessionId
+        Log.d(TAG, "Starting new session: $newSessionId")
+
+        _status.value = RelayStatus.STARTING_SESSION
+        
+        sendSessionStartMessage(newSessionId)
+        
+        // 5. Start recording audio
+        audioManager.startRecording(clientScope, onDataReceived = { data ->
+            // TODO: wait until session acknowledged (STREAMING_AUDIO)
+            if (data == null) {
+                Log.d(TAG, "Recording stream closed (null received)")
+                return@startRecording
+            }
+            
+            // ONLY send audio when we are in the STREAMING_AUDIO state.
+            // This prevents "pre-roll" audio from triggering VAD too early 
+            // and ensures we stop sending immediately when session ends.
+            if (_status.value == RelayStatus.STREAMING_AUDIO) {
+                sendAudioBytes(data)
+            }
         })
     }
 
     fun endSession() {
-        audioManager?.stopRecording()
-        sendAudioEndMessage()
+        Log.d(TAG, "Ending session $sessionId...")
+        // Moving to PROCESSING immediately stops the audio flow in the startRecording callback
         _status.value = RelayStatus.PROCESSING
+        
+        audioManager.stopRecording()
+        sendAudioEndMessage()
+    }
+
+    internal fun stopRecordingOnly() {
+        audioManager.stopRecording()
     }
 
     private fun sendHelloMessage() {
@@ -153,11 +197,11 @@ object RelayWebsocketClient {
         socket?.send(json)
     }
 
-    private fun sendSessionStartMessage() {
+    private fun sendSessionStartMessage(id: String) {
         val message = SessionStartMessage(
             type = "session.start",
             timestamp = System.currentTimeMillis() / 1000,
-            session_id = "testing-session"
+            session_id = id
         )
 
         val json = Json.encodeToString(SessionStartMessage.serializer(), message)
@@ -171,7 +215,7 @@ object RelayWebsocketClient {
     private fun sendAudioEndMessage() {
         val message = AudioEndMessage(
             type = "audio.end",
-            session_id = sessionId ?: "testing-session",
+            session_id = sessionId ?: "unknown",
             reason = "user_ended"
         )
 
@@ -180,20 +224,26 @@ object RelayWebsocketClient {
     }
 
     private fun playCollectedTts() {
-        val manager = AudioManager()
+        if (ttsBuffer.isEmpty()) return
+        Log.d(TAG, "Playing collected TTS data (${ttsBuffer.size} bytes)")
+        val playbackManager = AudioManager()
         val dataToPlay = ttsBuffer
         ttsBuffer = ByteArray(0)
-        CoroutineScope(Dispatchers.IO).launch {
-            manager.playAudio(dataToPlay)
+        clientScope.launch {
+            playbackManager.playAudio(dataToPlay)
+            _status.value = RelayStatus.READY
         }
     }
 
     private fun setStatus(status: RelayStatus) {
+        Log.d(TAG, "Status changing: ${_status.value} -> $status")
         _status.value = status
     }
 
     private fun setSessionId(id: String?) {
-        sessionId = id
+        if (id != null) {
+            sessionId = id
+        }
     }
 
     private fun addTtsData(data: ByteArray) {
